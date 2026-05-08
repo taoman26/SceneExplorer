@@ -123,8 +123,8 @@ Run
 ### Haiku
 Get the source and build tools by running the following command.
 ```
-git clone https://github.com/ambiesoft/lsMisc.git
-git clone https://github.com/ambiesoft/SceneExplorer.git
+git clone https://github.com/taoman26/lsMisc.git
+git clone https://github.com/taoman26/SceneExplorer.git
 ```
 
 Build SceneExplorer with following commands.
