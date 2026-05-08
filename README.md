@@ -13,7 +13,7 @@ Download the binary from <https://github.com/ambiesoft/SceneExplorer/releases>.
 This software is freeware. See LICENSE.
 
 ## Environment
-Windows7 or above and Linux, maybe MacOS too.
+Windows7 or above and Linux and Haiku, maybe MacOS too.
 
 ## Install
 Installation is not required, extract an archive file.
@@ -102,7 +102,6 @@ Run *build.bat*. This will build SceneExplorer into *C:\Linkout\SceneExplorer*.
 ### Linux
 Get the source and build tools by running the following command.
 ```
-git clone https://github.com/ambiesoft/profile.git
 git clone https://github.com/ambiesoft/lsMisc.git
 git clone https://github.com/ambiesoft/SceneExplorer.git
 ```
@@ -114,6 +113,33 @@ $ mkdir build
 $ cd build
 $ qmake ../src/SceneExplorer.pro
 $ make
+```
+
+Run
+```
+./SceneExplorer
+```
+
+### Haiku
+Get the source and build tools by running the following command.
+```
+git clone https://github.com/taoman26/lsMisc.git
+git clone https://github.com/taoman26/SceneExplorer.git
+```
+
+Build SceneExplorer with following commands.
+```
+$ cd SceneExplorer
+$ mkdir build
+$ cd build
+$ qmake ../src/SceneExplorer.pro
+$ make
+```
+
+To add SceneExplorer to the Deskbar Applications menu:
+```
+mkdir -p ~/config/settings/deskbar/menu/Applications
+ln -s $(pwd)/SceneExplorer ~/config/settings/deskbar/menu/Applications/SceneExplorer
 ```
 
 Run

@@ -192,7 +192,7 @@ win32 {
     }
     RC_ICONS += icon.ico
 }
-linux {
+linux|haiku {
     message("linux-g++")
     DEFINES += "AMBIESOFT_FILENAME_CASESENSITIVE=\"1\""
 
