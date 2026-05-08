@@ -21,7 +21,9 @@
 #endif
 
 #include <unistd.h>
+#ifdef __linux__
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
+#endif
 
 #include <sys/time.h>
 #include <sys/resource.h>
