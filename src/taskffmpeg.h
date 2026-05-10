@@ -50,6 +50,7 @@ private:
     QString ffmpeg_;
 
     QString movieFile_;
+    QString effectiveMovieFile_; // for ISO: path to extracted VOB; otherwise same as movieFile_
     // QMutex mutex_;
     // int fileIndex_=0;
     Progress progress_;
