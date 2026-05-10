@@ -164,16 +164,7 @@ public:
         endResetModel();
     }
     int getActualColumnIndex(int ci) const {
-        if(columnCountImage_==5)
-            return ci;
-        switch(ci)
-        {
-        case 0:return 0;
-        case 1:return 2;
-        case 2:return 4;
-        }
-        Q_ASSERT(false);
-        return 0;
+        return ci;
     }
 
     void UpdateRecord(const QString& movieFile,
