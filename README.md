@@ -109,11 +109,15 @@ git clone https://github.com/ambiesoft/SceneExplorer.git
 Build SceneExplorer with following commands.
 ```
 $ cd SceneExplorer
+$ sh prepareGitrev.sh
 $ mkdir build
 $ cd build
 $ qmake ../src/SceneExplorer.pro
 $ make
 ```
+
+> **Note**: `prepareGitrev.sh` generates `src/gitrev.h` which embeds the git commit hash
+> shown in the About dialog. Run it before the first build and whenever you update the source.
 
 Run
 ```
@@ -130,11 +134,15 @@ git clone https://github.com/taoman26/SceneExplorer.git
 Build SceneExplorer with following commands.
 ```
 $ cd SceneExplorer
+$ sh prepareGitrev.sh
 $ mkdir build
 $ cd build
 $ qmake ../src/SceneExplorer.pro
 $ make
 ```
+
+> **Note**: `prepareGitrev.sh` generates `src/gitrev.h` which embeds the git commit hash
+> shown in the About dialog. Run it before the first build and whenever you update the source.
 
 To add SceneExplorer to the Deskbar Applications menu:
 ```
