@@ -1,5 +1,10 @@
 # SceneExplorer
 
+> **Note**: This is a fork of [ambiesoft/SceneExplorer](https://github.com/ambiesoft/SceneExplorer) with the following custom extensions:
+> - Selectable thumbnail count per video (3, 5, or 10)
+> - Timestamp overlay on thumbnails
+> - DVD ISO file support (thumbnail generation via p7zip)
+
 SceneExplore explores video files through thumbnails.
 
 ## Feature

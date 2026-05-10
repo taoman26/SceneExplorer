@@ -1,4 +1,10 @@
 # SceneExplorer
+
+> **注意**: このリポジトリは [ambiesoft/SceneExplorer](https://github.com/ambiesoft/SceneExplorer) のforkで、以下の独自拡張を加えています。
+> - 動画ごとのサムネイル枚数を選択可能（3枚・5枚・10枚）
+> - サムネイルへのタイムスタンプ表示
+> - DVD ISOファイル対応（p7zipを使ったサムネイル生成）
+
 SceneExploreは動画ファイルのサムネイルを表示するアプリケーションです。
 
 ## 特徴
