@@ -56,6 +56,7 @@ private:
     QString thumbext_;
     int thumbWidth_=0;
     int thumbHeight_=0;
+    int thumbCount_=5;
     bool isUpdateOnly_=false;
     qint64 recordid_=0;
     bool getProbe(const QString& file,
@@ -92,6 +93,7 @@ public:
                const IFFTask2Main* pFF2M,
                const QString& thumbext,
                int thumbWidth, int thumbHeight,
+               int thumbCount,
                const bool isUpdateOnly);
     virtual ~TaskFFmpeg() override;
     void setRecordID(const qint64& recordid) {

@@ -24,6 +24,10 @@
 #include <QJsonArray>
 #include <QUuid>
 #include <QDir>
+#include <QImage>
+#include <QPainter>
+#include <QFont>
+#include <QFontMetrics>
 
 #include "globals.h"
 #include "consts.h"
@@ -36,6 +40,51 @@
 #include "taskffmpeg.h"
 
 using namespace Consts;
+
+namespace {
+
+QString formatTimestamp(double seconds)
+{
+    int h = (int)(seconds / 3600);
+    int m = (int)((seconds - h * 3600) / 60);
+    int s = (int)(seconds - h * 3600 - m * 60);
+    if (h > 0)
+        return QString("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+    else
+        return QString("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+}
+
+void overlayTimestamp(const QString& imagePath, double timeSeconds)
+{
+    QImage img(imagePath);
+    if (img.isNull() || img.width() == 0 || img.height() == 0)
+        return;
+
+    QString ts = formatTimestamp(timeSeconds);
+
+    QPainter p(&img);
+    QFont font = p.font();
+    font.setPixelSize(qMax(10, img.height() / 10));
+    font.setBold(true);
+    p.setFont(font);
+
+    QFontMetrics fm(font);
+    QRect textRect = fm.boundingRect(ts);
+    const int margin = 4;
+    int bgX = margin;
+    int bgW = textRect.width() + margin * 2;
+    int bgH = textRect.height() + margin;
+    int bgY = img.height() - bgH - margin;
+
+    p.fillRect(bgX, bgY, bgW, bgH, QColor(0, 0, 0, 160));
+    p.setPen(Qt::white);
+    p.drawText(bgX + margin, bgY + textRect.height(), ts);
+    p.end();
+
+    img.save(imagePath);
+}
+
+} // namespace
 
 int TaskFFmpeg::waitMax_ = -1;
 
@@ -60,6 +109,7 @@ TaskFFmpeg::TaskFFmpeg(const QString& ffprobe,
                        const IFFTask2Main* pFF2M,
                        const QString& thumbext,
                        int thumbWidth, int thumbHeight,
+                       int thumbCount,
                        const bool isUpdateOnly)
 {
     loopId_ = loopId;
@@ -75,6 +125,7 @@ TaskFFmpeg::TaskFFmpeg(const QString& ffprobe,
     thumbext_ = thumbext;
     thumbWidth_ = thumbWidth;
     thumbHeight_ = thumbHeight;
+    thumbCount_ = thumbCount;
     // emit sayBorn(id,file);
 
     isUpdateOnly_=isUpdateOnly;
@@ -381,13 +432,13 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                       QStringList& filenames,QString& errorReason)
 {
     filenames.clear();
-    for(int i=1 ; i <=5 ;++i)
+    for(int i=1 ; i <= thumbCount_ ;++i)
     {
         QString filename=createThumbFileName(i, thumbid, thumbWidth_, thumbHeight_,thumbext_);
 
         QString actualFile = QString(FILEPART_THUMBS) + QDir::separator() + filename;
 
-        double timepoint = (((double)i-0.5)*duration/5);
+        double timepoint = (((double)i-0.5)*duration/thumbCount_);
         QStringList qsl;
         qsl.append("-v");
         qsl.append("16");  // only error output
@@ -433,10 +484,6 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
             return false;
         }
 
-        //        QByteArray baOut = ffmpeg.readAllStandardOutput();
-        //        qDebug()<<baOut.data();
-
-
         if(i==1)
         {
             if (!QFile(actualFile).exists())
@@ -451,6 +498,7 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                 }
                 return false;
             }
+            overlayTimestamp(actualFile, timepoint);
         }
         else
         {
@@ -463,6 +511,10 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                     errorReason += tr("Failed to create dummy thumbnail");
                     return false;
                 }
+            }
+            else
+            {
+                overlayTimestamp(actualFile, timepoint);
             }
         }
         filenames.append(filename);
@@ -481,11 +533,11 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     Q_ASSERT(filenames.empty());
     QStringList actualFiles;
     QList<double> timepoints;
-    for(int i=1 ; i <=5 ;++i)
+    for(int i=1 ; i <= thumbCount_ ;++i)
     {
         QString filename = createThumbFileName(i, thumbid, thumbWidth_, thumbHeight_,thumbext_);
         filenames.append(filename);
-        timepoints.append( (((double)i-0.5)*duration/5) );
+        timepoints.append( (((double)i-0.5)*duration/thumbCount_) );
         actualFiles.append( QString(FILEPART_THUMBS) + QDir::separator()
                             + filename);
     }
@@ -495,14 +547,14 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     qsl.append("16");  // only error output
     qsl.append("-hide_banner");  // as it is
     qsl.append("-n");  // no overwrite
-    for(int i=1; i <=5 ; ++i)
+    for(int i=1; i <= thumbCount_ ; ++i)
     {
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoints[i-1]) );  // seek position
         qsl.append("-i" );  // input file
         qsl.append(movieFile_ );  // input file
     }
-    for(int i=1; i <=5 ; ++i)
+    for(int i=1; i <= thumbCount_ ; ++i)
     {
         qsl.append("-map");
         qsl.append(QString::number(i-1) + ":v:0");
@@ -561,7 +613,9 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
         return false;
     }
 
-    for(int i=2 ; i <= 5 ; ++i)
+    overlayTimestamp(actualFiles[0], timepoints[0]);
+
+    for(int i=2 ; i <= thumbCount_ ; ++i)
     {
         // short movie will not create thumb
         if (!QFileInfo(actualFiles[i-1]).exists())
@@ -572,6 +626,10 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
                 errorReason += tr("Failed to create dummy thumbnail");
                 return false;
             }
+        }
+        else
+        {
+            overlayTimestamp(actualFiles[i-1], timepoints[i-1]);
         }
     }
 
