@@ -105,11 +105,15 @@ git clone https://github.com/ambiesoft/SceneExplorer.git
 以下のコマンドでビルドします。
 ```
 $ cd SceneExplorer
+$ sh prepareGitrev.sh
 $ mkdir build
 $ cd build
 $ qmake ../src/SceneExplorer.pro
 $ make
 ```
+
+> **注**: `prepareGitrev.sh` はAboutダイアログに表示されるgitコミットハッシュを含む
+> `src/gitrev.h` を生成します。初回ビルド前と、ソースを更新するたびに実行してください。
 
 実行
 ```
@@ -126,11 +130,15 @@ git clone https://github.com/taoman26/SceneExplorer.git
 以下のコマンドでビルドします。
 ```
 $ cd SceneExplorer
+$ sh prepareGitrev.sh
 $ mkdir build
 $ cd build
 $ qmake ../src/SceneExplorer.pro
 $ make
 ```
+
+> **注**: `prepareGitrev.sh` はAboutダイアログに表示されるgitコミットハッシュを含む
+> `src/gitrev.h` を生成します。初回ビルド前と、ソースを更新するたびに実行してください。
 
 デスクバーの Applications メニューに追加するには：
 ```
