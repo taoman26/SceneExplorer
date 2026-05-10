@@ -1,5 +1,10 @@
 # SceneExplorer
 
+> **Note**: This is a fork of [ambiesoft/SceneExplorer](https://github.com/ambiesoft/SceneExplorer) with the following custom extensions:
+> - Selectable thumbnail count per video (3, 5, or 10)
+> - Timestamp overlay on thumbnails
+> - DVD ISO file support (thumbnail generation via p7zip)
+
 SceneExplore explores video files through thumbnails.
 
 ## Feature
@@ -21,6 +26,14 @@ Installation is not required, extract an archive file.
 
 ## FFmpeg and FFprobe
 SceneExplorer needs FFmpeg and FFprove to create thumbnails. In windows distribution, these files are included in the archive file, you do not need to obtain them by yourself. 
+
+## p7zip (for DVD ISO support)
+To generate thumbnails from DVD ISO files, SceneExplorer requires **7z** (provided by p7zip).
+- **Linux**: install with `sudo apt install p7zip-full` (Debian/Ubuntu) or equivalent.
+- **Haiku**: install **p7zip** from HaikuDepot.
+- **Windows**: install [7-Zip](https://www.7-zip.org/) and ensure `7z.exe` is in your PATH.
+
+Without p7zip, ISO files will be scanned but thumbnails will not be generated.
 
 
 ## How to use

@@ -24,6 +24,12 @@
 #include <QJsonArray>
 #include <QUuid>
 #include <QDir>
+#include <QImage>
+#include <QPainter>
+#include <QFont>
+#include <QFontMetrics>
+#include <QTemporaryDir>
+#include <QFileInfo>
 
 #include "globals.h"
 #include "consts.h"
@@ -36,6 +42,137 @@
 #include "taskffmpeg.h"
 
 using namespace Consts;
+
+namespace {
+
+bool isIsoFile(const QString& file)
+{
+    return file.endsWith(".iso", Qt::CaseInsensitive);
+}
+
+// Use 7z to locate the main title VOB inside a DVD ISO and extract it to tempDir.
+// Returns the path of the extracted VOB, or an empty string on failure.
+QString extractVobFromIso(const QString& isoPath, QTemporaryDir& tempDir, QString& errorReason)
+{
+    if (!tempDir.isValid()) {
+        errorReason = QObject::tr("Failed to create temporary directory for ISO extraction");
+        return {};
+    }
+
+    // List all files in the ISO with metadata
+    QProcess listProc;
+    listProc.setProgram("7z");
+    listProc.setArguments({"l", "-slt", isoPath});
+    listProc.start(QProcess::ReadOnly);
+    if (!listProc.waitForFinished(30000)) {
+        errorReason = QObject::tr("7z: timed out listing ISO contents");
+        return {};
+    }
+    if (listProc.exitCode() != 0) {
+        errorReason = QObject::tr("7z: failed to list ISO (exit %1): %2")
+                          .arg(listProc.exitCode())
+                          .arg(QString::fromUtf8(listProc.readAllStandardError()));
+        return {};
+    }
+
+    // Parse listing: look for lines "Path = ..." and "Size = ..."
+    // Pick the largest VTS_XX_Y.VOB where Y > 0 (skip menu VOBs _0.VOB)
+    QString bestVobPath;
+    qint64  bestVobSize = 0;
+    QString curPath;
+    const QString listing = QString::fromUtf8(listProc.readAllStandardOutput());
+    for (const QString& rawLine : listing.split('\n')) {
+        const QString line = rawLine.trimmed();
+        if (line.startsWith("Path = ")) {
+            curPath = line.mid(7).trimmed();
+        } else if (line.startsWith("Size = ") && !curPath.isEmpty()) {
+            const QString upper = QFileInfo(curPath).fileName().toUpper();
+            if (upper.endsWith(".VOB") &&
+                !upper.startsWith("VIDEO_TS") &&   // skip VIDEO_TS.VOB (nav-only)
+                !upper.endsWith("_0.VOB"))          // skip menu VOBs
+            {
+                qint64 sz = line.mid(7).trimmed().toLongLong();
+                if (sz > bestVobSize) {
+                    bestVobSize = sz;
+                    bestVobPath = curPath;
+                }
+            }
+            curPath.clear();
+        }
+    }
+
+    if (bestVobPath.isEmpty()) {
+        errorReason = QObject::tr("No playable VOB file found in ISO");
+        return {};
+    }
+
+    // Extract the chosen VOB to the temporary directory
+    QProcess extProc;
+    extProc.setProgram("7z");
+    extProc.setArguments({"e", isoPath, bestVobPath, "-o" + tempDir.path(), "-y"});
+    extProc.start(QProcess::ReadOnly);
+    if (!extProc.waitForFinished(600000)) {   // 10 min timeout
+        errorReason = QObject::tr("7z: timed out extracting %1 from ISO").arg(bestVobPath);
+        return {};
+    }
+    if (extProc.exitCode() != 0) {
+        errorReason = QObject::tr("7z: extraction failed (exit %1): %2")
+                          .arg(extProc.exitCode())
+                          .arg(QString::fromUtf8(extProc.readAllStandardError()));
+        return {};
+    }
+
+    const QString extracted = tempDir.path() + "/" + QFileInfo(bestVobPath).fileName();
+    if (!QFileInfo(extracted).exists()) {
+        errorReason = QObject::tr("7z: extracted file not found at %1").arg(extracted);
+        return {};
+    }
+
+    return extracted;
+}
+
+QString formatTimestamp(double seconds)
+{
+    int h = (int)(seconds / 3600);
+    int m = (int)((seconds - h * 3600) / 60);
+    int s = (int)(seconds - h * 3600 - m * 60);
+    if (h > 0)
+        return QString("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+    else
+        return QString("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+}
+
+void overlayTimestamp(const QString& imagePath, double timeSeconds)
+{
+    QImage img(imagePath);
+    if (img.isNull() || img.width() == 0 || img.height() == 0)
+        return;
+
+    QString ts = formatTimestamp(timeSeconds);
+
+    QPainter p(&img);
+    QFont font = p.font();
+    font.setPixelSize(qMax(10, img.height() / 10));
+    font.setBold(true);
+    p.setFont(font);
+
+    QFontMetrics fm(font);
+    QRect textRect = fm.boundingRect(ts);
+    const int margin = 4;
+    int bgX = margin;
+    int bgW = textRect.width() + margin * 2;
+    int bgH = textRect.height() + margin;
+    int bgY = img.height() - bgH - margin;
+
+    p.fillRect(bgX, bgY, bgW, bgH, QColor(0, 0, 0, 160));
+    p.setPen(Qt::white);
+    p.drawText(bgX + margin, bgY + textRect.height(), ts);
+    p.end();
+
+    img.save(imagePath);
+}
+
+} // namespace
 
 int TaskFFmpeg::waitMax_ = -1;
 
@@ -60,6 +197,7 @@ TaskFFmpeg::TaskFFmpeg(const QString& ffprobe,
                        const IFFTask2Main* pFF2M,
                        const QString& thumbext,
                        int thumbWidth, int thumbHeight,
+                       int thumbCount,
                        const bool isUpdateOnly)
 {
     loopId_ = loopId;
@@ -68,13 +206,15 @@ TaskFFmpeg::TaskFFmpeg(const QString& ffprobe,
     ffprobe_ = ffprobe;
     ffmpeg_ = ffmpeg;
 
-    movieFile_=file;
+    movieFile_ = file;
+    effectiveMovieFile_ = file; // may be overridden in run3() for ISO files
 
     progress_ = Uninitialized;
     pFF2M_ = pFF2M;
     thumbext_ = thumbext;
     thumbWidth_ = thumbWidth;
     thumbHeight_ = thumbHeight;
+    thumbCount_ = thumbCount;
     // emit sayBorn(id,file);
 
     isUpdateOnly_=isUpdateOnly;
@@ -116,16 +256,15 @@ bool TaskFFmpeg::getProbe(const QString& file,
 {
     QProcess process;
     process.setProgram(ffprobe_);
-    process.setArguments( QStringList() <<
-                          "-v" <<
-                          "quiet" <<
-                          "-hide_banner" <<
-                          "-show_format" <<
-                          "-show_streams" <<
-                          "-print_format" <<
-                          "json" <<
-                          file
-                          );
+
+    QStringList args;
+    args << "-v" << "quiet"
+         << "-hide_banner"
+         << "-show_format"
+         << "-show_streams"
+         << "-print_format" << "json"
+         << file;
+    process.setArguments(args);
 
     process.start(QProcess::ReadOnly);
     if(!process.waitForStarted(waitMax_))
@@ -317,13 +456,22 @@ void TaskFFmpeg::run2()
 
 bool TaskFFmpeg::run3(QString& errorReason)
 {
+    // For DVD ISO files, extract the main VOB to a temporary directory first.
+    // QTemporaryDir auto-cleans when run3 returns.
+    QTemporaryDir isoTempDir;
+    if (isIsoFile(movieFile_)) {
+        effectiveMovieFile_ = extractVobFromIso(movieFile_, isoTempDir, errorReason);
+        if (effectiveMovieFile_.isEmpty())
+            return false;
+    }
+
     double duration;
     QString format;
     int bitrate=0;
     QString vcodec,acodec;
     double fps=0;
     int vWidth,vHeight;
-    if(!getProbe(movieFile_,
+    if(!getProbe(effectiveMovieFile_,
                  duration,
                  format,
                  bitrate,
@@ -381,13 +529,13 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                       QStringList& filenames,QString& errorReason)
 {
     filenames.clear();
-    for(int i=1 ; i <=5 ;++i)
+    for(int i=1 ; i <= thumbCount_ ;++i)
     {
         QString filename=createThumbFileName(i, thumbid, thumbWidth_, thumbHeight_,thumbext_);
 
         QString actualFile = QString(FILEPART_THUMBS) + QDir::separator() + filename;
 
-        double timepoint = (((double)i-0.5)*duration/5);
+        double timepoint = (((double)i-0.5)*duration/thumbCount_);
         QStringList qsl;
         qsl.append("-v");
         qsl.append("16");  // only error output
@@ -396,7 +544,7 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoint) );  // seek position
         qsl.append("-i" );  // input file
-        qsl.append(movieFile_ );  // input file
+        qsl.append(effectiveMovieFile_ );  // input file
         qsl.append("-vf" );  // video filtergraph
         qsl.append("select='eq(pict_type\\,I)'");  // select filter with argument, Select only I-frames:
         qsl.append("-vframes" );
@@ -433,10 +581,6 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
             return false;
         }
 
-        //        QByteArray baOut = ffmpeg.readAllStandardOutput();
-        //        qDebug()<<baOut.data();
-
-
         if(i==1)
         {
             if (!QFile(actualFile).exists())
@@ -451,6 +595,7 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                 }
                 return false;
             }
+            overlayTimestamp(actualFile, timepoint);
         }
         else
         {
@@ -463,6 +608,10 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
                     errorReason += tr("Failed to create dummy thumbnail");
                     return false;
                 }
+            }
+            else
+            {
+                overlayTimestamp(actualFile, timepoint);
             }
         }
         filenames.append(filename);
@@ -481,11 +630,11 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     Q_ASSERT(filenames.empty());
     QStringList actualFiles;
     QList<double> timepoints;
-    for(int i=1 ; i <=5 ;++i)
+    for(int i=1 ; i <= thumbCount_ ;++i)
     {
         QString filename = createThumbFileName(i, thumbid, thumbWidth_, thumbHeight_,thumbext_);
         filenames.append(filename);
-        timepoints.append( (((double)i-0.5)*duration/5) );
+        timepoints.append( (((double)i-0.5)*duration/thumbCount_) );
         actualFiles.append( QString(FILEPART_THUMBS) + QDir::separator()
                             + filename);
     }
@@ -495,14 +644,14 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     qsl.append("16");  // only error output
     qsl.append("-hide_banner");  // as it is
     qsl.append("-n");  // no overwrite
-    for(int i=1; i <=5 ; ++i)
+    for(int i=1; i <= thumbCount_ ; ++i)
     {
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoints[i-1]) );  // seek position
         qsl.append("-i" );  // input file
-        qsl.append(movieFile_ );  // input file
+        qsl.append(effectiveMovieFile_ );  // input file
     }
-    for(int i=1; i <=5 ; ++i)
+    for(int i=1; i <= thumbCount_ ; ++i)
     {
         qsl.append("-map");
         qsl.append(QString::number(i-1) + ":v:0");
@@ -561,7 +710,9 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
         return false;
     }
 
-    for(int i=2 ; i <= 5 ; ++i)
+    overlayTimestamp(actualFiles[0], timepoints[0]);
+
+    for(int i=2 ; i <= thumbCount_ ; ++i)
     {
         // short movie will not create thumb
         if (!QFileInfo(actualFiles[i-1]).exists())
@@ -572,6 +723,10 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
                 errorReason += tr("Failed to create dummy thumbnail");
                 return false;
             }
+        }
+        else
+        {
+            overlayTimestamp(actualFiles[i-1], timepoints[i-1]);
         }
     }
 

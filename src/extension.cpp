@@ -71,6 +71,7 @@ QStringList Extension::GetDefaultAllow()
         ".ogg",
         ".ogm",
         ".ogv",
+        ".iso",
         ".qt",
         ".rm",
         ".rmvb",
@@ -242,7 +243,14 @@ void Extension::Load(IniSettings& settings)
     vVal = settings.value(KEY_ALLOW_EXTENSIONS);
     if(vVal.isValid())
     {
-        Extension::SetMovieExtensionAllow(vVal.toStringList());
+        // Merge any new defaults added since last save into the user's saved list.
+        // This ensures extensions added in app updates are visible without requiring
+        // the user to manually update their settings.
+        QStringList saved = vVal.toStringList();
+        for (const QString& ext : GetDefaultAllow())
+            if (!saved.contains(ext, Qt::CaseInsensitive))
+                saved.append(ext);
+        Extension::SetMovieExtensionAllow(saved);
     }
     else
     {

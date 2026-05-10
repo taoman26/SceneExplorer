@@ -522,7 +522,7 @@ QSqlQuery* Sql::getModifyFromFFmpegQuery(TableItemDataPointer tid, const qint64&
 
 qint64 Sql::InsertDataFromFFmpeg(TableItemDataPointer tid)
 {
-    Q_ASSERT(tid->getThumbnailFiles().count()==5);
+    Q_ASSERT(!tid->getThumbnailFiles().isEmpty());
     if(tid->getThumbnailFiles().isEmpty())
         return THUMBFILE_NOT_FOUND;
 
@@ -1249,7 +1249,7 @@ bool Sql::GetAll(QList<TableItemDataPointer>& v,
         //            VERIFY(UpdateThumbExtFromFile(id,thumbid, thumbext));
         //        }
         QStringList thumbs;
-        for(int i=1 ; i <= 5 ; ++i)
+        for(int i=1 ; i <= 10 ; ++i)
         {
             thumbs.append(createThumbFileName(i, thumbid, thumbWidth, thumbHeight,thumbext));
         }

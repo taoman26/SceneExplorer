@@ -823,6 +823,7 @@ void MainWindow::afterFilter2(int loopId,int id,
                                            this,
                                            optionThumbFormat_,
                                            GetThumbWidth(), GetThumbHeight(),
+                                           optionThumbCount_,
                                            false);
         pTask->setAutoDelete(true);
         QObject::connect(pTask, &TaskFFmpeg::sayHello,
@@ -855,6 +856,7 @@ void MainWindow::afterFilter2(int loopId,int id,
                                            this,
                                            optionThumbFormat_,
                                            GetThumbWidth(), GetThumbHeight(),
+                                           optionThumbCount_,
                                            true);
         pTask->setRecordID(toUpdateFiles[i].first);
         pTask->setAutoDelete(true);
