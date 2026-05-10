@@ -317,7 +317,7 @@ MainWindow::MainWindow(QWidget *parent,
     optionThreadcountGetDir_ = settings_.valueInt(KEY_MAX_GETDIR_THREADCOUNT, optionThreadcountGetDir_);
     optionThreadcountThumbnail_ = settings_.valueInt(KEY_MAX_THUMBNAIL_THREADCOUNT, optionThreadcountThumbnail_);
     optionThumbCount_ = settings_.valueInt(KEY_THUMBNAIL_COUNT, 3);
-    if(optionThumbCount_ != 3 && optionThumbCount_ != 5)
+    if(optionThumbCount_ != 3 && optionThumbCount_ != 5 && optionThumbCount_ != 10)
         optionThumbCount_ = 3;
     optionThumbFormat_ = settings_.valueString(KEY_THUMBNAIL_FORMAT, "jpg");
 

@@ -41,6 +41,7 @@ OptionDialog::OptionDialog(AmbiesoftQt::IniSettings& settings, QWidget* parent)
 
     ui.cmbThumbCount->addItem("3");
     ui.cmbThumbCount->addItem("5");
+    ui.cmbThumbCount->addItem("10");
 
     ui.cmbThumbImageFormat->addItem("jpg");
     ui.cmbThumbImageFormat->addItem("png");
@@ -70,8 +71,10 @@ void OptionDialog::showEvent(QShowEvent *ev)
     ui.spinBoxGetDir->setValue(maxgd_);
     ui.spinBoxThumb->setValue(maxff_);
 
-    Q_ASSERT(ui.cmbThumbCount->count()==2);
-    if(thumbCount_==5)
+    Q_ASSERT(ui.cmbThumbCount->count()==3);
+    if(thumbCount_==10)
+        ui.cmbThumbCount->setCurrentIndex(2);
+    else if(thumbCount_==5)
         ui.cmbThumbCount->setCurrentIndex(1);
     else
         ui.cmbThumbCount->setCurrentIndex(0);
@@ -159,7 +162,8 @@ void OptionDialog::accept()
     maxgd_ = ui.spinBoxGetDir->value();
     maxff_ = ui.spinBoxThumb->value();
 
-    thumbCount_ = ui.cmbThumbCount->currentIndex()==0 ? 3 : 5;
+    int idx = ui.cmbThumbCount->currentIndex();
+    thumbCount_ = (idx==2) ? 10 : (idx==1) ? 5 : 3;
     thumbWidth_ = ui.spinBoxThumbWidth->value();
     thumbHeight_ = ui.spinBoxThumbHeight->value();
     thumbFormat_ = ui.cmbThumbImageFormat->lineEdit()->text();
