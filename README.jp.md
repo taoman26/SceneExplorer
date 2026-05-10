@@ -25,6 +25,14 @@ Windows7以上で動作します。LinuxやHaiku、macOSでも動作するかも
 ## FFmpeg と FFprobe
 SceneExplorerはサムネイルを作成するためにFFmpegとFFproveが必要になります。Windowsの配布ファイルにはこれらが含まれています。これらはLGPL互換モードでビルドされたものなのでいくつかの機能が存在しない可能性がありサムネイルを作成できない可能性があります。オプション設定で実行ファイル指定できるので変えたい場合は変えてください。
 
+## p7zip（DVD ISOサポート用）
+DVD ISOファイルのサムネイルを生成するには、**7z**（p7zipが提供）が必要です。
+- **Linux**: `sudo apt install p7zip-full`（Debian/Ubuntu系）または同等のコマンド。
+- **Haiku**: HaikuDepotから **p7zip** をインストール。
+- **Windows**: [7-Zip](https://www.7-zip.org/) をインストールし、`7z.exe` がPATHに含まれるようにしてください。
+
+p7zipがない場合、ISOファイルはスキャンされますがサムネイルは生成されません。
+
 
 ## 使い方
 ### フォルダを追加する

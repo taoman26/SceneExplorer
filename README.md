@@ -22,6 +22,14 @@ Installation is not required, extract an archive file.
 ## FFmpeg and FFprobe
 SceneExplorer needs FFmpeg and FFprove to create thumbnails. In windows distribution, these files are included in the archive file, you do not need to obtain them by yourself. 
 
+## p7zip (for DVD ISO support)
+To generate thumbnails from DVD ISO files, SceneExplorer requires **7z** (provided by p7zip).
+- **Linux**: install with `sudo apt install p7zip-full` (Debian/Ubuntu) or equivalent.
+- **Haiku**: install **p7zip** from HaikuDepot.
+- **Windows**: install [7-Zip](https://www.7-zip.org/) and ensure `7z.exe` is in your PATH.
+
+Without p7zip, ISO files will be scanned but thumbnails will not be generated.
+
 
 ## How to use
 ### Add a folder containing videos.
