@@ -43,6 +43,11 @@ using namespace Consts;
 
 namespace {
 
+bool isIsoFile(const QString& file)
+{
+    return file.endsWith(".iso", Qt::CaseInsensitive);
+}
+
 QString formatTimestamp(double seconds)
 {
     int h = (int)(seconds / 3600);
@@ -167,16 +172,20 @@ bool TaskFFmpeg::getProbe(const QString& file,
 {
     QProcess process;
     process.setProgram(ffprobe_);
-    process.setArguments( QStringList() <<
-                          "-v" <<
-                          "quiet" <<
-                          "-hide_banner" <<
-                          "-show_format" <<
-                          "-show_streams" <<
-                          "-print_format" <<
-                          "json" <<
-                          file
-                          );
+
+    QStringList args;
+    args << "-v" << "quiet"
+         << "-hide_banner"
+         << "-show_format"
+         << "-show_streams"
+         << "-print_format" << "json";
+    if (isIsoFile(file)) {
+        // DVD ISO: use libdvdread via -dvd-device; dvd:// selects title 1
+        args << "-dvd-device" << file << "dvd://";
+    } else {
+        args << file;
+    }
+    process.setArguments(args);
 
     process.start(QProcess::ReadOnly);
     if(!process.waitForStarted(waitMax_))
@@ -446,8 +455,16 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
         qsl.append("-n");  // no overwrite
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoint) );  // seek position
-        qsl.append("-i" );  // input file
-        qsl.append(movieFile_ );  // input file
+        if (isIsoFile(movieFile_)) {
+            // DVD ISO: seek then open via libdvdread
+            qsl.append("-dvd-device");
+            qsl.append(movieFile_);
+            qsl.append("-i");
+            qsl.append("dvd://");
+        } else {
+            qsl.append("-i" );  // input file
+            qsl.append(movieFile_ );  // input file
+        }
         qsl.append("-vf" );  // video filtergraph
         qsl.append("select='eq(pict_type\\,I)'");  // select filter with argument, Select only I-frames:
         qsl.append("-vframes" );
@@ -525,6 +542,10 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
 bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QString& thumbid,
                       QStringList& filenames,QString& errorReason)
 {
+    // DVD ISO files require sequential per-frame extraction; fall through to run4_old
+    if (isIsoFile(movieFile_))
+        return false;
+
     // ffmpeg.exe -hide_banner
     // -ss 25.73 -i in.mp4
     // -ss 66.73 -i in.mp4

@@ -71,6 +71,7 @@ QStringList Extension::GetDefaultAllow()
         ".ogg",
         ".ogm",
         ".ogv",
+        ".iso",
         ".qt",
         ".rm",
         ".rmvb",
