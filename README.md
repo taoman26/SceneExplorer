@@ -12,13 +12,13 @@ SceneExplore explores video files through thumbnails.
 * Supported video format is dependent on FFmpeg.
 
 ## Download
-Download the binary from <https://github.com/ambiesoft/SceneExplorer/releases>.
+Download the official binary from <https://github.com/ambiesoft/SceneExplorer/releases>.
 
 ## License
 This software is freeware. See LICENSE.
 
 ## Environment
-Windows7 or above and Linux and Haiku, maybe MacOS too.
+Runs on Windows 7 or above. This repository is customized for Linux and Haiku, and has been verified on Ubuntu 22.04 and Haiku OS. It may also run on macOS.
 
 ## Install
 Installation is not required, extract an archive file.
@@ -89,6 +89,8 @@ See *Help -> About Documents* to confirm which files are used.
 Open 'src\SceneExplorer.pro' and build.
 
 ### Windows (incomplete)
+The source in this repository has not been verified on Windows. If you need reliable Windows behavior, follow the official repository instructions.
+
 Get the source and build tools by running the following command.
 ```
 git clone https://github.com/ambiesoft/distSolution.git
@@ -115,8 +117,8 @@ Run *build.bat*. This will build SceneExplorer into *C:\Linkout\SceneExplorer*.
 ### Linux
 Get the source and build tools by running the following command.
 ```
-git clone https://github.com/ambiesoft/lsMisc.git
-git clone https://github.com/ambiesoft/SceneExplorer.git
+git clone https://github.com/taoman26/lsMisc.git
+git clone https://github.com/taoman26/SceneExplorer.git
 ```
 
 Build SceneExplorer with following commands.
@@ -172,7 +174,9 @@ Run
 
 
 ## Support
-If you have troubles, post *Issue* on <https://github.com/ambiesoft/SceneExplorer/issues>.
+For Windows users, post *Issue* on <https://github.com/ambiesoft/SceneExplorer/issues>.
+
+For Linux and Haiku users, post *Issue* on <https://github.com/taoman26/SceneExplorer/issues>.
 
 ## Donate
 Support Ambiesoft by making a donation. See <https://ambiesoft.github.io/webjumper/?target=donate>.
