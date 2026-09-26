@@ -1,0 +1,13 @@
+{
+  "name": "sceneexplorer-webui-server",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

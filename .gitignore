@@ -24,3 +24,12 @@ SceneExplorer_resource.rc
 ui_directoryentrydialog.h
 
 src/gitrev.h
+webui/data/
+webui/**/node_modules/
+webui/client/dist/
+
+# Local AI-assistant notes and settings (not part of the project)
+CLAUDE.md
+.claude/
+webui/**/*.log
+webui/**/*.sqlite3*
