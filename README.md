@@ -84,6 +84,88 @@ See *Help -> About Documents* to confirm which files are used.
 2. Remove those files and directories. 
 
 
+## WebUI (use the library from any machine on your LAN)
+
+> **Platform**: the WebUI has been developed and tested **on Linux only** (Ubuntu, including WSL2). Windows, macOS and Haiku are untested; see "Running on other systems" below for what has to be changed there.
+
+`webui/` contains a browser interface (React) served by a small Node.js server. It reads the same database, thumbnails and
+document file as the Qt application, so **SceneExplorer does not have to be running** to browse, search, play and tag.
+Scanning folders and creating thumbnails are still done in the Qt application.
+
+* Browse by folder / tag / untagged / missing, search by file name, sort, page through thumbnails
+* Play videos in the browser (HTTP range streaming), jump to a thumbnail's position, download
+* Edit tags (shared with the Qt application through the document file); the play count is updated too
+* User accounts: `admin` (everything + user management), `user` (tags, play counts), `viewer` (read only)
+* Phone, tablet and desktop layouts
+
+### Start (Linux)
+Requires **Node.js 22.13 or newer**.
+```
+cd webui
+./start.sh
+```
+`start.sh` installs the dependencies and builds the client on first run, then prints the URLs to open, e.g.
+`http://192.168.1.20:8686`. **The first visitor creates the administrator account, so open the page right away.**
+Further users are added by an administrator from the user menu -> *ユーザー管理*.
+
+Settings (environment variables, all optional):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SE_HOST` | `0.0.0.0` | Listen address. Use `127.0.0.1` to allow this machine only |
+| `SE_PORT` | `8686` | Port |
+| `SE_DB_DIR` | `~/.local/share/Ambiesoft/SceneExplorer` | Database directory (`db.sqlite3`, `thumbs/`); same as the Qt application's *Database directory* |
+| `SE_DOC_FILE` | `~/Documents/SceneExplorer/default.scexd` | Document file to show |
+| `SE_DATA_DIR` | `webui/data` | Where the WebUI keeps its user accounts (`webui.sqlite3`) |
+
+### Running on other systems (untested)
+Everything below is untested; the code itself is plain Node.js and browser code, but these Linux-specific parts need attention:
+
+* **`start.sh` is a bash script.** On Windows, run the steps by hand (PowerShell):
+  ```
+  cd webui\server;  npm install --omit=dev
+  cd ..\client;      npm install; npm run build
+  cd ..\server
+  $env:SE_DB_DIR   = "$env:LOCALAPPDATA\Ambiesoft\SceneExplorer"
+  $env:SE_DOC_FILE = "$env:USERPROFILE\Documents\SceneExplorer\default.scexd"
+  node src/index.js
+  ```
+  (`cmd.exe`: use `set SE_DB_DIR=...`.) Node.js 22.13 or newer is needed on every platform.
+* **Default paths are the Linux ones** (`~/.local/share/Ambiesoft/SceneExplorer`, `~/Documents/SceneExplorer/default.scexd`, defined in
+  `webui/server/src/config.js`). On other systems set `SE_DB_DIR` / `SE_DOC_FILE`; the paths the Qt application really uses are shown in
+  its *Help -> About Documents* dialog (Windows defaults: see *Files and Directories* above).
+* **Video paths are read from the database as they were recorded by the Qt application** (absolute paths). The server must run on a
+  machine where those exact paths exist. A database created on Windows (`C:/Videos/...`) will list its videos on a Linux server, but
+  they cannot be played unless the same paths exist there. Windows-style paths (drive letters, backslashes) have not been tried.
+* **Development tools** (`webui/dev/*`, `webui/design/make_design.py`): the shell scripts need bash, and the Python scripts need
+  Pillow, ffmpeg and a Japanese font whose path is hard-coded (`FONT` in the scripts, currently Noto Sans CJK under
+  `/usr/share/fonts`). `run_dummy_server.sh` refuses to start on real-library paths by matching Linux default paths; adapt that
+  check for other systems.
+* Thumbnails are found on disk in both of the Qt application's naming forms (default size `<id>-<n>.jpg`, custom size
+  `<id>-<W>x<H>-<n>.jpg`), so the thumbnail size setting does not matter.
+
+### Notes
+* **HTTP only, for trusted LANs.** Do not expose the port to the internet. If you need HTTPS or remote access, put a reverse
+  proxy (with TLS) or a VPN in front of it. All API access, including thumbnails and video streams, requires signing in;
+  failed sign-ins are rate limited.
+* The video files must be reachable from the machine running the server (mounted disks). Videos on unmounted disks are listed,
+  but cannot be played.
+* Formats that the browser cannot decode (depends on the browser) can only be downloaded; there is no transcoding.
+* If the Qt application is running while you edit tags, it may need to reload the document to show the changes.
+* **WSL2**: by default only the Windows host can reach a server inside WSL2. To use it from other machines, enable
+  `networkingMode=mirrored` in `%UserProfile%\.wslconfig` (then `wsl --shutdown`), or forward the port with
+  `netsh interface portproxy` and allow it in Windows Firewall. Windows Firewall may also ask for permission on native Windows.
+
+### Development
+```
+cd webui/server && npm test          # API tests (generated dummy libraries only)
+cd webui/client && npm run dev       # Vite dev server, proxies /api to localhost:8686
+python3 webui/dev/make_dummy_library.py /tmp/dummy                  # fake library with 120 videos
+webui/dev/run_dummy_server.sh /tmp/dummy /tmp/dummy-webui-data      # run the WebUI on the fake library
+```
+Screen designs (`webui/design/*.png`, made by `webui/design/make_design.py`), `webui/design.md` and `webui/schema.md` describe the
+UI and the API. Please use the dummy library, not your real library, for screenshots and bug reports.
+
 ## Build
 ### Windows (by QtCreator)
 Open 'src\SceneExplorer.pro' and build.

@@ -84,6 +84,88 @@ start "" %~dp0SceneExplorer.exe %~dp0MyApp.scexd
 1. **[ヘルプ] → [ドキュメントについて]**を選択します。使われているファイルやディレクトリを確認できます。
 2. それらのファイルを削除します。
 
+## WebUI(LAN内のどのマシンからでもブラウザで操作)
+
+> **対応環境**: WebUI は **Linux(Ubuntu。WSL2 を含む)でのみ**開発・動作確認をしています。Windows、macOS、Haiku は未確認です。それらで動かす場合に変更が必要な点は、下の「他の環境で動かす場合」を参照してください。
+
+`webui/` に、Node.js の小さなサーバーと React 製のブラウザ UI が入っています。Qt アプリと同じデータベース・サムネイル・
+ドキュメントファイルを読むため、**SceneExplorer を起動していなくても**閲覧・検索・再生・タグ編集ができます。
+フォルダのスキャンやサムネイル作成は、これまでどおり Qt アプリで行います。
+
+* フォルダ / タグ / タグなし / 欠損ファイルで絞り込み、ファイル名検索、並び替え、ページ送り
+* ブラウザ内で動画を再生(HTTP Range 対応)、サムネイルの位置へジャンプ、ダウンロード
+* タグの編集(ドキュメントファイル経由で Qt アプリと共有)。再生回数も更新されます
+* ユーザー認証: `admin`(全操作とユーザー管理)、`user`(タグ・再生回数)、`viewer`(閲覧のみ)
+* スマホ・タブレット・PC のレイアウトに対応
+
+### 起動(Linux)
+**Node.js 22.13 以上**が必要です。
+```
+cd webui
+./start.sh
+```
+初回は依存パッケージのインストールとクライアントのビルドを行い、開くべき URL(例: `http://192.168.1.20:8686`)を表示します。
+**最初にアクセスした人が管理者アカウントを作成するため、起動後すぐにアクセスしてください。**
+ユーザーの追加は、管理者がユーザーメニューの「ユーザー管理」から行います。
+
+設定(環境変数。すべて省略可):
+
+| 変数 | 既定値 | 内容 |
+|---|---|---|
+| `SE_HOST` | `0.0.0.0` | 待ち受けアドレス。このマシンだけに限定するなら `127.0.0.1` |
+| `SE_PORT` | `8686` | ポート |
+| `SE_DB_DIR` | `~/.local/share/Ambiesoft/SceneExplorer` | データベースディレクトリ(`db.sqlite3` と `thumbs/`)。Qt アプリの「データベースディレクトリ」と同じもの |
+| `SE_DOC_FILE` | `~/Documents/SceneExplorer/default.scexd` | 表示するドキュメントファイル |
+| `SE_DATA_DIR` | `webui/data` | WebUI のユーザーアカウント(`webui.sqlite3`)の保存先 |
+
+### 他の環境で動かす場合(未確認)
+以下はすべて未確認です。コード自体は Node.js とブラウザ用の標準的なものですが、Linux に依存している次の部分に注意が必要です。
+
+* **`start.sh` は bash スクリプトです。** Windows では、手順を手で実行してください(PowerShell)。
+  ```
+  cd webui\server;  npm install --omit=dev
+  cd ..\client;      npm install; npm run build
+  cd ..\server
+  $env:SE_DB_DIR   = "$env:LOCALAPPDATA\Ambiesoft\SceneExplorer"
+  $env:SE_DOC_FILE = "$env:USERPROFILE\Documents\SceneExplorer\default.scexd"
+  node src/index.js
+  ```
+  (`cmd.exe` では `set SE_DB_DIR=...`)。Node.js 22.13 以上が、どの環境でも必要です。
+* **既定のパスは Linux のものです**(`~/.local/share/Ambiesoft/SceneExplorer`、`~/Documents/SceneExplorer/default.scexd`。
+  `webui/server/src/config.js` で定義)。他の環境では `SE_DB_DIR` と `SE_DOC_FILE` を指定してください。Qt アプリが実際に使っている
+  パスは、*ヘルプ -> ドキュメントについて* で確認できます(Windows の既定値は上の「ファイルやディレクトリ」を参照)。
+* **動画のパスは、Qt アプリが記録したままの絶対パスとしてデータベースから読みます。** そのパスが実在するマシンでサーバーを
+  動かす必要があります。Windows で作ったデータベース(`C:/Videos/...`)を Linux のサーバーで開くと、動画は一覧に出ますが、同じ
+  パスがなければ再生できません。Windows 形式のパス(ドライブ文字、バックスラッシュ)は試していません。
+* **開発用ツール**(`webui/dev/*`、`webui/design/make_design.py`): シェルスクリプトは bash が必要で、Python スクリプトは Pillow、ffmpeg、
+  パスが固定された日本語フォント(スクリプト内の `FONT`。現在は `/usr/share/fonts` の Noto Sans CJK)が必要です。
+  `run_dummy_server.sh` は Linux の既定パスとの一致で実ライブラリを判定して起動を拒否するので、他の環境では判定を直してください。
+* サムネイルは、Qt アプリの 2 種類のファイル名形式(既定サイズは `<id>-<n>.jpg`、任意のサイズは `<id>-<幅>x<高さ>-<n>.jpg`)
+  のどちらでも、ディスク上から見つけます。サムネイルサイズの設定は問いません。
+
+### 注意
+* **HTTP のみで、信頼できる LAN 内での利用が前提です。** ポートをインターネットに公開しないでください。HTTPS や外出先からの
+  利用が必要な場合は、TLS 対応のリバースプロキシや VPN を前段に置いてください。サムネイルや動画を含むすべての API は
+  ログインが必要で、ログインの連続失敗は制限されます。
+* 動画ファイルは、サーバーを動かすマシンから見える場所(マウント済みのディスク)にある必要があります。未マウントのディスクの
+  動画は一覧に出ますが再生できません。
+* ブラウザが再生できない形式(ブラウザによって異なります)はダウンロードのみです。トランスコードは行いません。
+* Qt アプリの起動中にタグを編集した場合、Qt アプリ側で変更を見るにはドキュメントの再読み込みが必要かもしれません。
+* **WSL2**: 既定では、WSL2 内のサーバーには Windows ホストからしかアクセスできません。他のマシンから使うには、
+  `%UserProfile%\.wslconfig` で `networkingMode=mirrored` を有効にする(その後 `wsl --shutdown`)か、`netsh interface portproxy`
+  でポートを転送して Windows ファイアウォールで許可してください。Windows 上で直接動かす場合も、ファイアウォールの許可を
+  求められることがあります。
+
+### 開発
+```
+cd webui/server && npm test          # API テスト(自動生成したダミーライブラリのみ使用)
+cd webui/client && npm run dev       # Vite 開発サーバー(/api を localhost:8686 へ中継)
+python3 webui/dev/make_dummy_library.py /tmp/dummy                  # 動画120本のダミーライブラリ
+webui/dev/run_dummy_server.sh /tmp/dummy /tmp/dummy-webui-data      # ダミーライブラリで WebUI を起動
+```
+画面デザイン(`webui/design/*.png`、`webui/design/make_design.py` で生成)、`webui/design.md`、`webui/schema.md` に UI と API の
+仕様があります。スクリーンショットや不具合報告には、実ライブラリではなくダミーライブラリを使ってください。
+
 ## ビルド
 ### Windows
 本リポジトリのソースはWindowsで動作を確認していません。Windowsで確実に動作させたい場合は、公式サイトの手順に従ってください。
