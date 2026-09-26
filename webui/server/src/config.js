@@ -1,6 +1,6 @@
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 

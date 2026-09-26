@@ -1,5 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import { openWebuiDb } from './db.js';
 import { createAuth, csrfGuard } from './auth.js';
@@ -11,6 +11,7 @@ import { createUsersRouter } from './users.js';
 export function createApp(config, { limiter } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.set('query parser', 'simple'); // Express 5 default; keeps req.query values plain strings
   app.set('config', config);
 
   const db = openWebuiDb(config.dataDir);

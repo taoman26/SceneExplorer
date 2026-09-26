@@ -1,5 +1,6 @@
 import express from 'express';
 import { hashPassword } from './password.js';
+import { asyncHandler } from './asynchandler.js';
 import { USERNAME_RE, MIN_PASSWORD, MAX_PASSWORD } from './auth.js';
 
 const ROLES = ['admin', 'user', 'viewer'];
@@ -35,7 +36,7 @@ export function createUsersRouter(db, requireRole) {
 
   router.get('/users', (_req, res) => res.json(q.all.all().map(pub)));
 
-  router.post('/users', async (req, res) => {
+  router.post('/users', asyncHandler(async (req, res) => {
     const { username, password, role } = req.body || {};
     if (typeof username !== 'string' || !USERNAME_RE.test(username)) return fail(res, 400, 'invalid_username', 'ユーザー名は英数字と _ . - の1〜32文字で指定してください');
     if (!validPassword(password)) return fail(res, 400, 'invalid_password', `パスワードは${MIN_PASSWORD}文字以上で指定してください`);
@@ -47,9 +48,9 @@ export function createUsersRouter(db, requireRole) {
     });
     if (out === null) return fail(res, 409, 'user_exists', 'そのユーザー名はすでに使われています');
     res.status(201).json(pub(q.byId.get(out)));
-  });
+  }));
 
-  router.patch('/users/:id', async (req, res) => {
+  router.patch('/users/:id', asyncHandler(async (req, res) => {
     const id = userId(req.params.id);
     const { role, password } = req.body || {};
     if (role === undefined && password === undefined) return fail(res, 400, 'nothing_to_change');
@@ -73,7 +74,7 @@ export function createUsersRouter(db, requireRole) {
     if (result === 'not_found') return fail(res, 404, 'user_not_found');
     if (result === 'last_admin') return fail(res, 409, 'last_admin', '最後の管理者の権限は変更できません');
     res.json(pub(q.byId.get(id)));
-  });
+  }));
 
   router.delete('/users/:id', (req, res) => {
     const id = userId(req.params.id);

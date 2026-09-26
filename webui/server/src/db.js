@@ -1,6 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
+import path from 'path';
+import { DatabaseSync } from './sqlite.js';
 
 export function openWebuiDb(dataDir) {
   fs.mkdirSync(dataDir, { recursive: true });

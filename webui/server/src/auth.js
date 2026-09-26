@@ -1,7 +1,8 @@
-import crypto from 'node:crypto';
+import crypto from 'crypto';
 import express from 'express';
 import { hashPassword, verifyPassword, DUMMY_HASH } from './password.js';
 import { createLoginLimiter } from './ratelimit.js';
+import { asyncHandler } from './asynchandler.js';
 
 export const COOKIE = 'se_session';
 const SESSION_SECONDS = 7 * 24 * 3600;
@@ -57,7 +58,7 @@ export function createAuth(db, { limiter = createLoginLimiter() } = {}) {
   };
 
   function startSession(req, res, userId) {
-    const token = crypto.randomBytes(32).toString('base64url');
+    const token = crypto.randomBytes(32).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     const t = now();
     q.pruneSessions.run(t);
     q.insertSession.run(sha256(token), userId, t, t + SESSION_SECONDS);
@@ -80,7 +81,7 @@ export function createAuth(db, { limiter = createLoginLimiter() } = {}) {
 
   const roleRank = { viewer: 0, user: 1, admin: 2 };
   const requireRole = (min) => (req, res, next) =>
-    roleRank[req.user?.role] >= roleRank[min] ? next() : res.status(403).json({ error: 'forbidden' });
+    roleRank[req.user ? req.user.role : undefined] >= roleRank[min] ? next() : res.status(403).json({ error: 'forbidden' });
 
   const router = express.Router();
 
@@ -88,7 +89,7 @@ export function createAuth(db, { limiter = createLoginLimiter() } = {}) {
     res.json({ needsSetup: q.userCount.get().n === 0, user: req.user });
   });
 
-  router.post('/setup', async (req, res) => {
+  router.post('/setup', asyncHandler(async (req, res) => {
     const err = validateCredentials(req.body);
     if (err) return res.status(400).json({ error: 'invalid', message: err });
     const pwHash = await hashPassword(req.body.password);
@@ -108,9 +109,9 @@ export function createAuth(db, { limiter = createLoginLimiter() } = {}) {
     }
     startSession(req, res, id);
     res.status(201).json({ user: { id, username: req.body.username, role: 'admin' } });
-  });
+  }));
 
-  router.post('/login', async (req, res) => {
+  router.post('/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body || {};
     if (typeof username !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'invalid' });
@@ -130,7 +131,7 @@ export function createAuth(db, { limiter = createLoginLimiter() } = {}) {
     limiter.reset(key);
     startSession(req, res, user.id);
     res.json({ user: { id: user.id, username: user.username, role: user.role } });
-  });
+  }));
 
   router.post('/logout', (req, res) => {
     const token = parseCookies(req.headers.cookie)[COOKIE];

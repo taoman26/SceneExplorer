@@ -1,5 +1,5 @@
-import crypto from 'node:crypto';
-import { promisify } from 'node:util';
+import crypto from 'crypto';
+import { promisify } from 'util';
 
 const scrypt = promisify(crypto.scrypt);
 const N = 16384;
@@ -21,4 +21,6 @@ export async function verifyPassword(password, stored) {
 }
 
 // Verified against when the user doesn't exist, so timing doesn't reveal valid usernames.
-export const DUMMY_HASH = await hashPassword('dummy-password-for-timing');
+// (computed synchronously: Node 12 has no top-level await)
+const DUMMY_SALT = crypto.randomBytes(16);
+export const DUMMY_HASH = `${N}$${DUMMY_SALT.toString('base64')}$${crypto.scryptSync('dummy-password-for-timing', DUMMY_SALT, KEYLEN, { N }).toString('base64')}`;

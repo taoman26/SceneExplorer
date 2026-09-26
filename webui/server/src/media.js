@@ -1,6 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
+import path from 'path';
+import { DatabaseSync } from './sqlite.js';
 import express from 'express';
 import { makeWithLibrary, idParam } from './library.js';
 import { makeThumbFinder } from './thumbs.js';
@@ -22,7 +22,7 @@ export function recordOpen(config, dbid, id) {
   } catch (e) {
     console.error('recordOpen failed:', e.message);
   } finally {
-    doc?.close();
+    if (doc) doc.close();
   }
 }
 
@@ -39,7 +39,7 @@ export function createMediaRouter(config) {
     if (!['user', 'admin'].includes(req.user.role)) return false;
     const key = `${req.user.id}:${id}`;
     const t = Date.now();
-    if (t - (recent.get(key) ?? 0) < COUNT_DEDUPE_MS) return false;
+    if (t - (recent.get(key) || 0) < COUNT_DEDUPE_MS) return false;
     recent.set(key, t);
     if (recent.size > 5000) recent.delete(recent.keys().next().value);
     return true;
@@ -63,7 +63,7 @@ export function createMediaRouter(config) {
     const file = row.directory + row.name;
     let st;
     try { st = fs.statSync(file); } catch { st = null; }
-    if (!st?.isFile()) return res.status(404).json({ error: 'file_unavailable' });
+    if (!(st && st.isFile())) return res.status(404).json({ error: 'file_unavailable' });
 
     const download = req.query.download === '1';
     if (download) res.set('Content-Disposition', attachment(row.name));

@@ -2,12 +2,15 @@
   "name": "sceneexplorer-webui-server",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=12.17"
+  },
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test"
+    "test": "echo \"tests need Node 22+ (node:test); not run on Node 12\""
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "better-sqlite3": "^7.6.2",
+    "express": "^4.22.3"
   }
 }

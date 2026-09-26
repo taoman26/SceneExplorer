@@ -1,9 +1,9 @@
-import test from 'node:test';
+import test from 'test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { DatabaseSync } from './sqlite.js';
 import { createApp } from './app.js';
 import { makeFixture, VIDEO_BYTES, DBID } from './fixtures.js';
 import { hashPassword } from './password.js';

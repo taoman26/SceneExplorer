@@ -1,5 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from 'fs';
+import path from 'path';
 
 // Qt names thumbnails  <thumbid>-<N>.<ext>            when they have its default size (240x180), and
 //                      <thumbid>-<W>x<H>-<N>.<ext>    for any other size (the size is a user setting).
@@ -9,13 +9,13 @@ export function makeThumbFinder(config) {
   const known = new Set(['187x140']); // sizes seen so far; tried first
   let listing = null;                  // cached directory listing, refreshed at most every rescanMs
   let listedAt = 0;
-  const rescanMs = config.thumbRescanMs ?? 2000;
+  const rescanMs = config.thumbRescanMs || 2000;
 
   function candidates(row, n) {
     const ext = row.thumbext || 'jpg';
     return [`${row.thumbid}-${n}.${ext}`, ...[...known].map((s) => `${row.thumbid}-${s}-${n}.${ext}`)];
   }
-  const firstExisting = (names) => names.map((f) => path.join(dir, f)).find((p) => fs.existsSync(p)) ?? null;
+  const firstExisting = (names) => names.map((f) => path.join(dir, f)).find((p) => fs.existsSync(p)) || null;
 
   // Returns the absolute path of thumbnail n of this video, or null.
   return function findThumb(row, n) {

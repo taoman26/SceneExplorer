@@ -1,8 +1,8 @@
 // Builds a tiny fake Qt library (db.sqlite3 + .scexd + thumbs) from dummy data, for tests.
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { DatabaseSync } from './sqlite.js';
 
 export const DBID = 'test-dbid-0000';
 // Fake "video": 1000 known bytes, enough to test Range handling.

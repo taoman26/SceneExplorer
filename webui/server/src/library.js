@@ -1,6 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
+import path from 'path';
+import { DatabaseSync } from './sqlite.js';
 import express from 'express';
 import { makeThumbFinder } from './thumbs.js';
 
@@ -21,7 +21,8 @@ export function openLibrary(config) {
   const db = new DatabaseSync(libFile, { readOnly: true });
   try {
     db.exec('PRAGMA busy_timeout = 5000');
-    db.prepare('ATTACH DATABASE ? AS doc').run(`file:${config.docFile}?mode=ro`);
+    // the connection is read-only, so the attached document is read-only too
+    db.prepare('ATTACH DATABASE ? AS doc').run(config.docFile);
     const info = db.prepare('SELECT dbid FROM DbInfo WHERE id = 1').get();
     if (!info) throw new LibraryUnavailable();
     return { db, dbid: info.dbid };
@@ -42,7 +43,7 @@ function toVideo(r) {
     id: r.id, directory: r.directory, name: r.name, path: r.directory + r.name,
     size: r.size, wtime: r.wtime, duration: r.duration, format: r.format, bitrate: r.bitrate,
     vcodec: r.vcodec, acodec: r.acodec, width: r.vwidth, height: r.vheight, fps: r.fps,
-    opencount: r.opencount ?? 0, lastaccess: r.lastaccess ?? null,
+    opencount: r.opencount || 0, lastaccess: r.lastaccess == null ? null : r.lastaccess,
   };
 }
 
@@ -70,7 +71,7 @@ export const makeWithLibrary = (config) => (fn) => (req, res, next) => {
     if (e instanceof LibraryUnavailable) return res.status(503).json({ error: 'library_unavailable' });
     next(e);
   } finally {
-    lib?.db.close();
+    if (lib) lib.db.close();
   }
 };
 
@@ -103,7 +104,7 @@ export function createLibraryRouter(config) {
 
   router.get('/videos', withLibrary((db, dbid, req, res) => {
     const { dir, tag, untagged, missing, q } = req.query;
-    const sortKey = Object.hasOwn(SORTS, req.query.sort) ? req.query.sort : 'wtime';
+    const sortKey = Object.prototype.hasOwnProperty.call(SORTS, req.query.sort) ? req.query.sort : 'wtime';
     const order = req.query.order === 'asc' ? 'ASC' : 'DESC';
     const size = intParam(req.query.size, PAGE_DEFAULT, 1, PAGE_MAX);
     const page = intParam(req.query.page, 1, 1, 1e6);

@@ -1,8 +1,8 @@
-import test from 'node:test';
+import test from 'test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { createApp } from './app.js';
 import { hashPassword } from './password.js';
 

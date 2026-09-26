@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from './sqlite.js';
 import express from 'express';
 import { makeWithLibrary, idParam } from './library.js';
 
@@ -15,7 +15,7 @@ function inDocTransaction(config, fn) {
   let doc;
   try {
     doc = new DatabaseSync(config.docFile);
-    doc.exec(`PRAGMA busy_timeout = ${Number(config.docBusyMs ?? 3000)}`);
+    doc.exec(`PRAGMA busy_timeout = ${Number(config.docBusyMs || 3000)}`);
     doc.exec('BEGIN IMMEDIATE');
     try {
       const result = fn(doc);
@@ -31,7 +31,7 @@ function inDocTransaction(config, fn) {
     if (/readonly|read-only/i.test(e.message)) throw new HttpError(503, 'library_readonly');
     throw e;
   } finally {
-    doc?.close();
+    if (doc) doc.close();
   }
 }
 
@@ -49,7 +49,7 @@ export function createTagsRouter(config, requireRole) {
   const canEdit = requireRole('user');
 
   router.post('/tags', canEdit, withLibrary((db, dbid, req, res) => {
-    const tag = normalizeTagName(req.body?.tag);
+    const tag = normalizeTagName((req.body || {}).tag);
     if (!tag) return res.status(400).json({ error: 'invalid_tag', message: `タグ名は1〜${MAX_TAG_LEN}文字で入力してください` });
     try {
       const tagid = inDocTransaction(config, (doc) => {
@@ -83,7 +83,7 @@ export function createTagsRouter(config, requireRole) {
   // Replace the tag set of one video (applied as a diff so concurrent edits of other rows are untouched).
   router.put('/videos/:id/tags', canEdit, withLibrary((db, dbid, req, res) => {
     const id = idParam(req.params.id);
-    const list = req.body?.tagids;
+    const list = (req.body || {}).tagids;
     if (!Array.isArray(list) || list.length > MAX_TAGS_PER_VIDEO || !list.every((n) => Number.isInteger(n) && n > 0)) {
       return res.status(400).json({ error: 'invalid_tagids' });
     }

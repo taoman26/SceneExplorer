@@ -1,5 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from 'fs';
+import path from 'path';
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
 import { listenUrls } from './netinfo.js';
@@ -33,5 +33,5 @@ const server = app.listen(config.port, config.host, (err) => {
 server.on('error', onListenError);
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => { server.close(() => { app.locals.db.close(); process.exit(0); }); server.closeAllConnections?.(); });
+  process.on(sig, () => { server.close(() => { app.locals.db.close(); process.exit(0); }); if (server.closeAllConnections) server.closeAllConnections(); });
 }
