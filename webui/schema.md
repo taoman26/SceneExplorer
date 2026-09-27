@@ -29,6 +29,10 @@ sessions(token_hash TEXT PK,  -- sha256 of cookie token
          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
          created_at INT NOT NULL, expires_at INT NOT NULL);
 ```
+play_tokens(token_hash TEXT PK,  -- sha256 of the token; grants ONLY GET .../videos/:video_id/stream, nothing else
+            user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            video_id INT NOT NULL, created_at INT NOT NULL, expires_at INT NOT NULL);
+```
 
 ## Auth
 - First run (no users): `POST /api/auth/setup` creates the admin; afterwards it returns 409.
@@ -52,6 +56,8 @@ sessions(token_hash TEXT PK,  -- sha256 of cookie token
 | `GET /videos/:id` | `Video` with `thumbs[]`, `tags[]` |
 | `GET /videos/:id/thumb/:n` | JPEG thumbnail (n = 1..) |
 | `GET /videos/:id/stream[?download=1]` | video file, HTTP Range supported (206/416); missing file → 404 `file_unavailable`. Counts one open in `Access` (upsert) per user+video per 10 min; not counted for `download=1`, for `viewer` role, or when the document is unwritable (playback never fails because of it) |
+| `GET /videos/:id/stream?token=..` | same as above but authenticated by a play token instead of the session cookie (see below); used by the "VLCで再生" button so an external player, which sends no cookie, can fetch the stream |
+| `POST /videos/:id/play-token` | mint a play token for this video (any signed-in role, incl. viewer). `{token, url, expiresAt}`; `url` is the absolute stream URL with the token attached |
 | `PUT /videos/:id/tags` `{tagids:[..]}` | replace the tag set (role ≥ user), applied as a diff in one `BEGIN IMMEDIATE` transaction; unknown / other-library tag ids → 400 `invalid_tagids`; 404 for unknown video |
 | `POST /tags` `{tag}` | create tag (role ≥ user): trimmed NFC, 1–64 chars, no control chars; `yomi` = tag text (Qt dialog default); duplicate → 409 `tag_exists` + `tagid`. `DELETE /tags/:id` deletes the tag **and its `Tagged` rows** (Qt's own delete leaves orphan `Tagged` rows; harmless) |
 | (writes) | Qt may hold the document open: writes wait up to 3 s for its lock, then `503 library_busy`; unwritable file → `503 library_readonly`. The server blocks during that wait (synchronous SQLite), so keep transactions tiny |
@@ -63,6 +69,22 @@ sessions(token_hash TEXT PK,  -- sha256 of cookie token
 `GET /videos/:id` additionally returns `thumbCount` (probed on disk, contiguous from 1) and `available` (original file exists).
 Qt DB/doc missing or unreadable → `503 {error:"library_unavailable"}`; the server itself stays up. `/videos` `size` max 200 (default 48).
 Security: paths come from the DB only (never from request input); thumbnail/stream lookups go by numeric id.
+
+### Play tokens (external player support)
+The browser cannot launch a local application, so "play in VLC" downloads an `.m3u` playlist whose one entry is the
+stream URL; the OS/browser opens it in VLC if `.m3u` is associated with it (common default on Windows/macOS VLC installs;
+not guaranteed, and not configurable from here). Because VLC sends no cookie, the URL carries a **play token** instead of
+relying on the session:
+- Minted only by `POST /videos/:id/play-token` (requires a normal session + CSRF header), so only someone who can already
+  view the video can create one.
+- Scoped to exactly that one video's stream route — it grants nothing else (not thumbnails, not other videos, not the API).
+- Random 32-byte token, only its SHA-256 stored (like sessions); default lifetime 6h, configurable via `SE_PLAY_TOKEN_TTL_SEC`.
+- Multi-use within its lifetime (a player makes many ranged GETs while seeking/resuming), not single-use.
+- Trade-off: anyone who obtains the URL (e.g. the downloaded `.m3u` is shared) can stream that one video until it expires.
+  Kept short-lived and single-video-scoped to limit the blast radius; this is the same trade-off any "copy link" / signed-URL
+  feature makes.
+- The stream route is reachable with *either* the session cookie *or* a valid token for that video id; everything else
+  (`/api/videos/:id/thumb/:n`, `/api/videos`, …) still requires the normal session only.
 
 ## Config (env vars, all optional)
 `SE_HOST` (default `0.0.0.0`), `SE_PORT` (`8686`), `SE_DB_DIR`, `SE_DOC_FILE`, `SE_DATA_DIR`.

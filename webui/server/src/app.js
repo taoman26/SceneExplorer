@@ -5,6 +5,8 @@ import { openWebuiDb } from './db.js';
 import { createAuth, csrfGuard } from './auth.js';
 import { createLibraryRouter } from './library.js';
 import { createMediaRouter } from './media.js';
+import { createPlayTokenStore, createPlayTokenRouter } from './playtokens.js';
+import { createStreamRouter } from './stream.js';
 import { createTagsRouter } from './tags.js';
 import { createUsersRouter } from './users.js';
 
@@ -16,6 +18,7 @@ export function createApp(config, { limiter } = {}) {
   const db = openWebuiDb(config.dataDir);
   app.locals.db = db;
   const auth = createAuth(db, { limiter });
+  const playTokens = createPlayTokenStore(db);
 
   app.use((_req, res, next) => {
     res.set({
@@ -34,11 +37,16 @@ export function createApp(config, { limiter } = {}) {
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/auth', auth.router);
 
+  // The stream route authenticates itself (session cookie OR a play token scoped to that video), so an external
+  // player such as VLC, which sends no cookie, can fetch it. It must be mounted before the blanket gate below.
+  app.use('/api', createStreamRouter(config, playTokens));
+
   // Everything below this line requires a session.
   app.use('/api', auth.requireAuth);
   app.locals.auth = auth;
   app.use('/api', createLibraryRouter(config));
   app.use('/api', createMediaRouter(config));
+  app.use('/api', createPlayTokenRouter(config, playTokens));
   app.use('/api', createTagsRouter(config, auth.requireRole));
   app.use('/api', createUsersRouter(db, auth.requireRole));
 

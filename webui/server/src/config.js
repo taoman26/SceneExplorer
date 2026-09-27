@@ -47,5 +47,6 @@ export function loadConfig(env = process.env, { home = os.homedir(), readFile } 
     docFile: env.SE_DOC_FILE || path.join(documentsDir(env, home, readFile), 'SceneExplorer', 'default.scexd'),
     clientDir: env.SE_CLIENT_DIR || path.join(here, '../../client/dist'),
     dataDir: env.SE_DATA_DIR || path.join(here, '../../data'),
+    playTokenTtlSec: Number(env.SE_PLAY_TOKEN_TTL_SEC || 6 * 3600),
   };
 }

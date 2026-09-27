@@ -176,6 +176,8 @@ select {
 .info dd { margin: 0; word-break: break-all; }
 .detail-actions { display: flex; gap: 12px; margin-top: 20px; }
 .detail-actions > * { flex: 1; }
+.detail-actions + .detail-actions { margin-top: 12px; }
+.detail-side .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .modal .error-banner { margin-bottom: 12px; }
 
 @media (max-width: 900px) {

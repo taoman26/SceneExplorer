@@ -46,6 +46,9 @@ export interface VideoDetailData extends Video { thumbCount: number; available: 
 export const getVideo = (id: number) => api<VideoDetailData>(`/videos/${id}`);
 export const streamUrl = (id: number, download = false) => `/api/videos/${id}/stream${download ? '?download=1' : ''}`;
 
+export const createPlayToken = (id: number) =>
+  api<{ token: string; url: string; expiresAt: number }>(`/videos/${id}/play-token`, { method: 'POST' });
+
 export const setVideoTags = (id: number, tagids: number[]) =>
   api<{ tagids: number[] }>(`/videos/${id}/tags`, { method: 'PUT', body: { tagids } });
 export const createTag = (tag: string) => api<{ tagid: number; tag: string; count: number }>('/tags', { method: 'POST', body: { tag } });

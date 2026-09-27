@@ -12,13 +12,47 @@ function tagErrorMessage(e: unknown): string {
   return 'タグを更新できませんでした';
 }
 
+// A browser cannot launch a local application, so this downloads a one-entry .m3u playlist carrying a
+// short-lived, video-scoped play token (see webui/schema.md "Play tokens"). If .m3u is associated with VLC
+// (a common default on Windows/macOS installs) the OS opens it there; otherwise the user opens it by hand.
+function downloadPlaylist(url: string, title: string) {
+  const safeName = title.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\.[^.]*$/, '') || 'video';
+  const m3u = `#EXTM3U\n#EXTINF:-1,${title.replace(/[\r\n]/g, ' ')}\n${url}\n`;
+  const blobUrl = URL.createObjectURL(new Blob([m3u], { type: 'application/x-mpegurl' }));
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = `${safeName}.m3u`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
+function vlcErrorMessage(e: unknown): string {
+  if (e instanceof api.ApiError && e.status === 404) return '動画が見つかりません';
+  return 'VLC用のプレイリストを作成できませんでした';
+}
+
 export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged }: {
   id: number; tags: api.TagInfo[]; canEdit: boolean; onClose: () => void; onTagsChanged: () => void;
 }) {
   const [tagBusy, setTagBusy] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [vlcBusy, setVlcBusy] = useState(false);
+  const [vlcError, setVlcError] = useState<string | null>(null);
+  const [vlcNotice, setVlcNotice] = useState(false);
   const tagMap = new Map(tags.map((t) => [t.tagid, t]));
+
+  async function playInVlc() {
+    if (!video) return;
+    setVlcBusy(true); setVlcError(null); setVlcNotice(false);
+    try {
+      const { url } = await api.createPlayToken(video.id);
+      downloadPlaylist(url, video.name);
+      setVlcNotice(true);
+    } catch (e) { setVlcError(vlcErrorMessage(e)); } finally { setVlcBusy(false); }
+  }
 
   async function applyTags(next: number[], created?: api.TagInfo) {
     if (!video) return;
@@ -174,6 +208,18 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged 
                   全画面再生
                 </button>
               </div>
+              <div className="detail-actions">
+                <button disabled={!video.available || vlcBusy} onClick={() => void playInVlc()}
+                  title="ブラウザで再生できない場合に、ローカルのVLCで開きます">
+                  {vlcBusy ? 'VLC用ファイルを作成中…' : 'VLCで再生'}
+                </button>
+              </div>
+              {vlcNotice && (
+                <p className="hint">
+                  VLC用のプレイリストをダウンロードしました。自動で開かない場合は、ダウンロードしたファイルを手動でVLCから開いてください。
+                </p>
+              )}
+              {vlcError && <div className="error-banner" role="alert">{vlcError}</div>}
             </div>
           </div>
         )}
