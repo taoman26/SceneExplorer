@@ -1,4 +1,4 @@
-import test from 'test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listenUrls } from './netinfo.js';
 

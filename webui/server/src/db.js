@@ -23,6 +23,14 @@ export function openWebuiDb(dataDir) {
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL
     );
+    -- Grants ONLY "GET .../videos/:video_id/stream" (see playtokens.js), for external players (no cookie support).
+    CREATE TABLE IF NOT EXISTS play_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      video_id INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
   `);
   return db;
 }

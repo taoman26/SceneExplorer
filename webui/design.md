@@ -41,7 +41,8 @@ Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 1
 - **Pager**: 前 / `n / N` / 次, page size 48.
 - **Detail modal** (max 1040px): title, video player (HTML5, range streaming), 10-thumbnail strip (click seeks to the
   timestamp), info column (path, size, resolution, duration, codec, bitrate, fps, mtime, open count), tag toggle chips,
-  buttons ダウンロード / 全画面再生.
+  buttons ダウンロード / 全画面再生 / VLCで再生 (downloads an .m3u playlist carrying a short-lived play token; for
+  formats the browser can't decode).
 - **Login**: centered 420px card, username / password, サインイン, inline error box.
 - **Admin users**: table (name, role chip, last login, PW変更, 削除), ＋ユーザーを追加. Roles: 管理者 / 一般 / 閲覧のみ.
 
