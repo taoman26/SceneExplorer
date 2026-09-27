@@ -114,8 +114,8 @@ cd webui
 |---|---|---|
 | `SE_HOST` | `0.0.0.0` | 待ち受けアドレス。このマシンだけに限定するなら `127.0.0.1` |
 | `SE_PORT` | `8686` | ポート |
-| `SE_DB_DIR` | `~/.local/share/Ambiesoft/SceneExplorer` | データベースディレクトリ(`db.sqlite3` と `thumbs/`)。Qt アプリの「データベースディレクトリ」と同じもの |
-| `SE_DOC_FILE` | `~/Documents/SceneExplorer/default.scexd` | 表示するドキュメントファイル |
+| `SE_DB_DIR` | `$XDG_DATA_HOME/Ambiesoft/SceneExplorer`(`~/.local/share/...`) | データベースディレクトリ(`db.sqlite3` と `thumbs/`)。Qt アプリの「データベースディレクトリ」と同じもの |
+| `SE_DOC_FILE` | `<ドキュメントフォルダ>/SceneExplorer/default.scexd` | 表示するドキュメントファイル。ドキュメントフォルダは Qt アプリと同じ方法で調べるので、`~/ドキュメント` のようにデスクトップの言語で名前が変わっていても動きます(`$XDG_DOCUMENTS_DIR`、なければ `~/.config/user-dirs.dirs` の `XDG_DOCUMENTS_DIR`、それもなければ `~/Documents`) |
 | `SE_DATA_DIR` | `webui/data` | WebUI のユーザーアカウント(`webui.sqlite3`)の保存先 |
 
 ### 他の環境で動かす場合(未確認)
@@ -131,7 +131,7 @@ cd webui
   node src/index.js
   ```
   (`cmd.exe` では `set SE_DB_DIR=...`)。Node.js 22.13 以上が、どの環境でも必要です。
-* **既定のパスは Linux のものです**(`~/.local/share/Ambiesoft/SceneExplorer`、`~/Documents/SceneExplorer/default.scexd`。
+* **既定のパスは Linux のものです**(`$XDG_DATA_HOME/Ambiesoft/SceneExplorer` と XDG のドキュメントフォルダ。
   `webui/server/src/config.js` で定義)。他の環境では `SE_DB_DIR` と `SE_DOC_FILE` を指定してください。Qt アプリが実際に使っている
   パスは、*ヘルプ -> ドキュメントについて* で確認できます(Windows の既定値は上の「ファイルやディレクトリ」を参照)。
 * **動画のパスは、Qt アプリが記録したままの絶対パスとしてデータベースから読みます。** そのパスが実在するマシンでサーバーを

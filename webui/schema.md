@@ -66,3 +66,7 @@ Security: paths come from the DB only (never from request input); thumbnail/stre
 
 ## Config (env vars, all optional)
 `SE_HOST` (default `0.0.0.0`), `SE_PORT` (`8686`), `SE_DB_DIR`, `SE_DOC_FILE`, `SE_DATA_DIR`.
+Defaults follow the Qt app's `QStandardPaths` on Linux, because folder names are localized (e.g. `~/ドキュメント`):
+- `SE_DB_DIR` → `$XDG_DATA_HOME/Ambiesoft/SceneExplorer` (`~/.local/share/...`)
+- `SE_DOC_FILE` → `<Documents>/SceneExplorer/default.scexd`, where `<Documents>` is `$XDG_DOCUMENTS_DIR`, else `XDG_DOCUMENTS_DIR` in
+  `$XDG_CONFIG_HOME/user-dirs.dirs` (`$HOME/...` or absolute), else `~/Documents`.

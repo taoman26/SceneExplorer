@@ -114,8 +114,8 @@ Settings (environment variables, all optional):
 |---|---|---|
 | `SE_HOST` | `0.0.0.0` | Listen address. Use `127.0.0.1` to allow this machine only |
 | `SE_PORT` | `8686` | Port |
-| `SE_DB_DIR` | `~/.local/share/Ambiesoft/SceneExplorer` | Database directory (`db.sqlite3`, `thumbs/`); same as the Qt application's *Database directory* |
-| `SE_DOC_FILE` | `~/Documents/SceneExplorer/default.scexd` | Document file to show |
+| `SE_DB_DIR` | `$XDG_DATA_HOME/Ambiesoft/SceneExplorer` (`~/.local/share/...`) | Database directory (`db.sqlite3`, `thumbs/`); same as the Qt application's *Database directory* |
+| `SE_DOC_FILE` | `<Documents folder>/SceneExplorer/default.scexd` | Document file to show. The Documents folder is looked up the way the Qt application does it, so a localized name such as `~/ドキュメント` works: `$XDG_DOCUMENTS_DIR`, else `XDG_DOCUMENTS_DIR` in `~/.config/user-dirs.dirs`, else `~/Documents` |
 | `SE_DATA_DIR` | `webui/data` | Where the WebUI keeps its user accounts (`webui.sqlite3`) |
 
 ### Running on other systems (untested)
@@ -131,7 +131,7 @@ Everything below is untested; the code itself is plain Node.js and browser code,
   node src/index.js
   ```
   (`cmd.exe`: use `set SE_DB_DIR=...`.) Node.js 22.13 or newer is needed on every platform.
-* **Default paths are the Linux ones** (`~/.local/share/Ambiesoft/SceneExplorer`, `~/Documents/SceneExplorer/default.scexd`, defined in
+* **Default paths are the Linux ones** (`$XDG_DATA_HOME/Ambiesoft/SceneExplorer` and the XDG Documents folder, defined in
   `webui/server/src/config.js`). On other systems set `SE_DB_DIR` / `SE_DOC_FILE`; the paths the Qt application really uses are shown in
   its *Help -> About Documents* dialog (Windows defaults: see *Files and Directories* above).
 * **Video paths are read from the database as they were recorded by the Qt application** (absolute paths). The server must run on a
