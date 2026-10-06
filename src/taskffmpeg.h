@@ -31,6 +31,8 @@ class TaskFFmpeg : public QObject, public QRunnable
     Q_OBJECT
 
     static int waitMax_;
+    static const int processTimeout_;
+    bool ffmpegTimedOut_ = false;
 
     const IFFTask2Main* pFF2M_ = nullptr;
 

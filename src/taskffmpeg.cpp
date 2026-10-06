@@ -172,9 +172,29 @@ void overlayTimestamp(const QString& imagePath, double timeSeconds)
     img.save(imagePath);
 }
 
+// Wait for the process to finish. If it does not finish in time, kill it
+// so that a runaway ffmpeg can not keep the task (and a CPU core) forever.
+bool waitFinishedOrKill(QProcess& process, int msecs, QString& errorReason, bool& timedOut)
+{
+    if (process.waitForFinished(msecs))
+        return true;
+    if (process.state() != QProcess::NotRunning)
+    {
+        timedOut = true;
+        process.kill();
+        process.waitForFinished(5000);
+        errorReason += QObject::tr("Timed out after %1 seconds.").arg(msecs / 1000);
+        return false;
+    }
+    errorReason += process.errorString();
+    return false;
+}
+
 } // namespace
 
 int TaskFFmpeg::waitMax_ = -1;
+// ffmpeg/ffprobe must finish within this time or it will be killed.
+const int TaskFFmpeg::processTimeout_ = 5 * 60 * 1000;
 
 QString GetAsCommandLine(const QStringList& list)
 {
@@ -275,9 +295,8 @@ bool TaskFFmpeg::getProbe(const QString& file,
 
     setPriority(process);
 
-    if(!process.waitForFinished(waitMax_))
+    if (!waitFinishedOrKill(process, processTimeout_, errorReason, ffmpegTimedOut_))
     {
-        errorReason = process.errorString();
         return false;
     }
 
@@ -509,8 +528,11 @@ bool TaskFFmpeg::run3(QString& errorReason)
 
     QStringList filenames;
     if(!run4(duration,strWidthHeight,thumbid, filenames, errorReason))
-        if(!run4_old(duration,strWidthHeight,thumbid, filenames, errorReason))
+    {
+        // Retrying one by one is pointless (and slow) if ffmpeg was killed by timeout.
+        if(ffmpegTimedOut_ || !run4_old(duration,strWidthHeight,thumbid, filenames, errorReason))
             return false;
+    }
 
     emit sayGoodby(loopId_,id_,
                    filenames,
@@ -541,12 +563,16 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
         qsl.append("16");  // only error output
         qsl.append("-hide_banner");  // as it is
         qsl.append("-n");  // no overwrite
+        qsl.append("-nostdin");  // never wait for interactive input
+        qsl.append("-skip_frame");  // decode keyframes only: movies with sparse keyframes
+        qsl.append("nokey");  // would otherwise make ffmpeg decode a huge number of frames
+        qsl.append("-noaccurate_seek");  // use the nearest keyframe as is, do not decode up to the exact position
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoint) );  // seek position
         qsl.append("-i" );  // input file
         qsl.append(effectiveMovieFile_ );  // input file
-        qsl.append("-vf" );  // video filtergraph
-        qsl.append("select='eq(pict_type\\,I)'");  // select filter with argument, Select only I-frames:
+        qsl.append("-vsync");  // no frame dup/drop: the seeked frame may have a timestamp far from the seek position
+        qsl.append("0");
         qsl.append("-vframes" );
         qsl.append("1");
         qsl.append("-s");
@@ -566,9 +592,8 @@ bool TaskFFmpeg::run4_old(double duration, const QString& strWidthHeight, const 
 
         setPriority(process);
 
-        if (!process.waitForFinished(waitMax_))
+        if (!waitFinishedOrKill(process, processTimeout_, errorReason, ffmpegTimedOut_))
         {
-            errorReason += process.errorString();
             return false;
         }
 
@@ -644,8 +669,12 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     qsl.append("16");  // only error output
     qsl.append("-hide_banner");  // as it is
     qsl.append("-n");  // no overwrite
+    qsl.append("-nostdin");  // never wait for interactive input
     for(int i=1; i <= thumbCount_ ; ++i)
     {
+        qsl.append("-skip_frame");  // decode keyframes only: movies with sparse keyframes
+        qsl.append("nokey");  // would otherwise make ffmpeg decode a huge number of frames
+        qsl.append("-noaccurate_seek");  // use the nearest keyframe as is, do not decode up to the exact position
         qsl.append("-ss" );  // seek input
         qsl.append(QString::number(timepoints[i-1]) );  // seek position
         qsl.append("-i" );  // input file
@@ -655,8 +684,8 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
     {
         qsl.append("-map");
         qsl.append(QString::number(i-1) + ":v:0");
-        qsl.append("-vf" );  // video filtergraph
-        qsl.append("select='eq(pict_type\\,I)'");  // select filter with argument, Select only I-frames:
+        qsl.append("-vsync");  // no frame dup/drop: the seeked frame may have a timestamp far from the seek position
+        qsl.append("0");
         qsl.append("-vframes" );
         qsl.append("1");
         qsl.append("-s");
@@ -677,9 +706,8 @@ bool TaskFFmpeg::run4(double duration, const QString& strWidthHeight, const QStr
 
     setPriority(process);
 
-    if (!process.waitForFinished(waitMax_))
+    if (!waitFinishedOrKill(process, processTimeout_, errorReason, ffmpegTimedOut_))
     {
-        errorReason += process.errorString();
         return false;
     }
 
