@@ -13,6 +13,17 @@ const SORTS: [string, string][] = [
 ];
 const PAGE_SIZE = 48;
 
+function shuffled<T>(items: T[]): T[] {
+  const a = items.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+interface ShuffleState { ids: number[]; index: number }
+
 export default function Library() {
   const { user, signOut, refresh } = useAuth();
   const [sp, setSp] = useSearchParams();
@@ -27,6 +38,10 @@ export default function Library() {
   const [reload, setReload] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
   const [tagDelError, setTagDelError] = useState<string | null>(null);
+  const [shuffle, setShuffle] = useState<ShuffleState | null>(null);
+  const [shuffleBusy, setShuffleBusy] = useState(false);
+  const [shuffleError, setShuffleError] = useState<string | null>(null);
+  const unplayableStreak = useRef(0); // consecutive auto-skips (unavailable/undecodable); guards against spinning forever
   const canEdit = user?.role !== 'viewer';
 
   const filter: Filter = {
@@ -35,7 +50,7 @@ export default function Library() {
   const q = sp.get('q') ?? '';
   const sort = SORTS.some(([k]) => k === sp.get('sort')) ? sp.get('sort')! : 'wtime';
   const order = sp.get('order') === 'asc' ? 'asc' : 'desc';
-  const openId = sp.get('v') ? Number(sp.get('v')) : null;
+  const openId = shuffle ? shuffle.ids[shuffle.index] : (sp.get('v') ? Number(sp.get('v')) : null);
   const page = Math.max(1, Number.parseInt(sp.get('page') ?? '1', 10) || 1);
 
   // URL is the single source of truth for the view state (shareable, survives reload).
@@ -48,7 +63,26 @@ export default function Library() {
     }, { replace: true });
   }, [setSp]);
 
-  const closeDetail = useCallback(() => update({ v: null }, false), [update]);
+  const closeDetail = useCallback(() => { setShuffle(null); update({ v: null }, false); }, [update]);
+
+  // Advances the shuffle queue. `played` is false for an auto-skip (the video turned out unavailable or
+  // undecodable) rather than a real finish, so a filtered set that's entirely unplayable can't spin forever.
+  const advanceShuffle = useCallback((played: boolean) => {
+    unplayableStreak.current = played ? 0 : unplayableStreak.current + 1;
+    setShuffle((prev) => {
+      if (!prev) return null;
+      if (unplayableStreak.current >= prev.ids.length) {
+        setShuffleError('再生できる動画が見つかりませんでした');
+        update({ v: null }, false);
+        return null;
+      }
+      let ids = prev.ids;
+      let index = prev.index + 1;
+      if (index >= ids.length) { ids = shuffled(ids); index = 0; } // ran through the set: reshuffle and keep going
+      update({ v: String(ids[index]) }, false);
+      return { ids, index };
+    });
+  }, [update]);
 
   const fail = useCallback((e: unknown) => {
     if (e instanceof api.ApiError && e.status === 401) { void refresh(); return; }
@@ -73,6 +107,33 @@ export default function Library() {
     return p.toString();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, order, page, q, filter.dir, filter.tag, filter.untagged, filter.missing]);
+
+  // Same filter, no sort/page/size — what シャッフル再生 shuffles (the whole filtered set, not just this page).
+  const filterParams = useMemo(() => {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (filter.dir) p.set('dir', filter.dir);
+    if (filter.tag) p.set('tag', filter.tag);
+    if (filter.untagged) p.set('untagged', '1');
+    if (filter.missing) p.set('missing', '1');
+    return p;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, filter.dir, filter.tag, filter.untagged, filter.missing]);
+
+  async function startShuffle() {
+    setShuffleBusy(true); setShuffleError(null);
+    try {
+      const { ids: matched } = await api.listVideoIds(filterParams);
+      if (matched.length === 0) { setShuffleError('シャッフル再生できる動画がありません'); return; }
+      unplayableStreak.current = 0;
+      const ids = shuffled(matched);
+      setShuffle({ ids, index: 0 });
+      update({ v: String(ids[0]) }, false);
+    } catch (e) {
+      setShuffleError(e instanceof api.ApiError && e.code === 'library_too_large'
+        ? '動画が多すぎるためシャッフル再生できません' : 'シャッフル再生を開始できませんでした');
+    } finally { setShuffleBusy(false); }
+  }
 
   useEffect(() => {
     let stale = false; // ignore out-of-order responses
@@ -116,13 +177,19 @@ export default function Library() {
         <div className="logo">▶ <span>SceneExplorer</span></div>
         <input className="search" type="search" placeholder="タイトルを検索…" aria-label="タイトルを検索"
           value={qInput} onChange={(e) => setQInput(e.target.value)} />
-        <div className="sortbox">
-          <label htmlFor="sort">並び順:</label>
-          <select id="sort" value={sort} onChange={(e) => update({ sort: e.target.value })}>
-            {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
-          <button className="order-btn" aria-label={order === 'desc' ? '降順' : '昇順'}
-            onClick={() => update({ order: order === 'desc' ? 'asc' : null })}>{order === 'desc' ? '↓' : '↑'}</button>
+        <div className="toolbar-right">
+          <div className="sortbox">
+            <label htmlFor="sort">並び順:</label>
+            <select id="sort" value={sort} onChange={(e) => update({ sort: e.target.value })}>
+              {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <button className="order-btn" aria-label={order === 'desc' ? '降順' : '昇順'}
+              onClick={() => update({ order: order === 'desc' ? 'asc' : null })}>{order === 'desc' ? '↓' : '↑'}</button>
+          </div>
+          <button className="shuffle-btn" disabled={shuffleBusy || !list || list.total === 0}
+            onClick={() => void startShuffle()}>
+            {shuffleBusy ? '準備中…' : 'シャッフル再生'}
+          </button>
         </div>
         <div className="usermenu">
           <button onClick={() => setMenu((v) => !v)} aria-haspopup="menu" aria-expanded={menu}>{user?.username}</button>
@@ -163,6 +230,7 @@ export default function Library() {
         </div>
         {error && <div className="error-banner" role="alert">{error}</div>}
         {tagDelError && <div className="error-banner" role="alert">{tagDelError}</div>}
+        {shuffleError && <div className="error-banner" role="alert">{shuffleError}</div>}
         {list && list.items.length === 0 && !error && (
           <p className="empty">{q ? `「${q}」に一致する動画はありません` : '動画がありません'}</p>
         )}
@@ -178,7 +246,7 @@ export default function Library() {
         )}
       </main>
       {openId !== null && <VideoDetail id={openId} tags={tagList?.tags ?? []} canEdit={canEdit} onClose={closeDetail}
-        onTagsChanged={() => setReload((n) => n + 1)} />}
+        onTagsChanged={() => setReload((n) => n + 1)} onShuffleAdvance={shuffle ? advanceShuffle : undefined} />}
     </div>
   );
 }

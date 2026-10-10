@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { createApp } from './app.js';
 import { makeFixture } from './fixtures.js';
 
@@ -79,6 +80,36 @@ test('videos: filter by dir (incl. subdir), tag, untagged, missing', () => withA
   const miss = (await get('/api/videos?missing=1')).body;
   assert.equal(miss.total, 1);
   assert.equal(miss.items[0].id, 5);
+}));
+
+test('videos/ids: for シャッフル再生 — every matching id, no sort/page, same filters as /videos', () => withApp(async ({ get }) => {
+  const ids = async (q) => (await get(`/api/videos/ids${q}`)).body.ids.slice().sort((a, b) => a - b);
+  assert.deepEqual(await ids(''), [1, 2, 3, 4, 5]);
+  assert.deepEqual(await ids('?dir=1'), [1, 2, 3]);
+  assert.deepEqual(await ids('?dir=2'), [4, 5]);
+  assert.equal((await get('/api/videos/ids?dir=99')).status, 404);
+  assert.deepEqual(await ids('?tag=1'), [1, 3]);
+  assert.deepEqual(await ids('?untagged=1'), [2, 4, 5]);
+  assert.deepEqual(await ids('?missing=1'), [5]);
+  assert.deepEqual(await ids('?q=holiday'), [1, 3]);
+  // /videos/ids must not be shadowed by the /videos/:id route
+  assert.equal((await get('/api/videos/ids')).status, 200);
+}));
+
+test('videos/ids requires login too', () => withApp(async ({ base }) => {
+  assert.equal((await fetch(`${base}/api/videos/ids`)).status, 401);
+}));
+
+test('videos/ids: capped at 20000 ids (library_too_large), just under the cap still works', () => withApp(async ({ get, fx }) => {
+  const lib = new DatabaseSync(path.join(fx.config.dbDir, 'db.sqlite3'));
+  const ins = lib.prepare(`INSERT INTO FileInfo(id,directory,name,thumbid) VALUES (?,?,?,?)`);
+  lib.exec('BEGIN');
+  for (let id = 1000; id < 1000 + 19996; id++) ins.run(id, fx.mediaA, `bulk-${id}.mp4`, `bulk-${id}`); // 5 fixture + 19996 = 20001
+  lib.exec('COMMIT');
+  lib.close();
+  assert.equal((await get('/api/videos/ids')).status, 400);
+  assert.deepEqual((await get('/api/videos/ids')).body, { error: 'library_too_large', max: 20000 });
+  assert.equal((await get('/api/videos/ids?dir=2')).status, 200); // still well under the cap, unaffected
 }));
 
 test('videos: paging', () => withApp(async ({ get }) => {

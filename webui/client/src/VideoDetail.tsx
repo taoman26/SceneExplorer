@@ -33,9 +33,13 @@ function vlcErrorMessage(e: unknown): string {
   return 'VLC用のプレイリストを作成できませんでした';
 }
 
-export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged }: {
+export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged, onShuffleAdvance }: {
   id: number; tags: api.TagInfo[]; canEdit: boolean; onClose: () => void; onTagsChanged: () => void;
+  // Present only in shuffle playback: advances to the next (random) video. `played` is false when this call is an
+  // auto-skip (the video turned out unavailable/undecodable) rather than a real end-of-playback.
+  onShuffleAdvance?: (played: boolean) => void;
 }) {
+  const shuffling = !!onShuffleAdvance;
   const [tagBusy, setTagBusy] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
@@ -93,6 +97,14 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged 
   const [playError, setPlayError] = useState(false);
   const player = useRef<HTMLVideoElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const autoSkipped = useRef<number | null>(null); // video id already auto-skipped, so it only fires once each
+
+  // Shuffle mode keeps itself moving: a video that turns out unavailable (missing file) or undecodable
+  // (browser playback error) is skipped automatically instead of just sitting there.
+  useEffect(() => {
+    if (!onShuffleAdvance || !video || autoSkipped.current === video.id) return;
+    if (!video.available || playError) { autoSkipped.current = video.id; onShuffleAdvance(false); }
+  }, [onShuffleAdvance, video, playError]);
 
   useEffect(() => {
     let stale = false;
@@ -144,6 +156,7 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged 
       <div className="modal" role="dialog" aria-modal="true" aria-label={video?.name ?? '動画の詳細'} tabIndex={-1} ref={dialog}>
         <div className="modal-head">
           <h2 title={video?.name}>{video?.name ?? (loadError ? '' : '読み込み中…')}</h2>
+          {shuffling && <span className="shuffle-badge">シャッフル再生中</span>}
           <button className="icon-btn" aria-label="閉じる" onClick={onClose}>×</button>
         </div>
         {loadError && <div className="error-banner" role="alert">{loadError}</div>}
@@ -152,9 +165,10 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged 
             <div className="detail-main">
               <div className="player">
                 {video.available && !playError ? (
-                  <video key={video.id} ref={player} controls preload="none" playsInline
+                  <video key={video.id} ref={player} controls preload="none" playsInline autoPlay={shuffling}
                     poster={video.thumbCount ? api.thumbUrl(video.id, 1) : undefined}
-                    src={api.streamUrl(video.id)} onError={() => setPlayError(true)} />
+                    src={api.streamUrl(video.id)} onError={() => setPlayError(true)}
+                    onEnded={() => onShuffleAdvance?.(true)} />
                 ) : (
                   <div className="player-msg" role="alert">
                     {!video.available
@@ -220,6 +234,11 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged 
                 </p>
               )}
               {vlcError && <div className="error-banner" role="alert">{vlcError}</div>}
+              {shuffling && (
+                <div className="detail-actions">
+                  <button onClick={() => onShuffleAdvance?.(true)}>次の動画へ</button>
+                </div>
+              )}
             </div>
           </div>
         )}

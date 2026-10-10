@@ -10,6 +10,7 @@ const SORTS = {
 };
 const PAGE_DEFAULT = 48;
 const PAGE_MAX = 200;
+const IDS_MAX = 20000; // /videos/ids (shuffle playback): plain ints, cheap, but still bounded
 
 export class LibraryUnavailable extends Error {}
 
@@ -49,6 +50,32 @@ function toVideo(r) {
 const SELECT = `SELECT f.id, f.directory, f.name, f.size, f.wtime, f.duration, f.format, f.bitrate,
     f.vcodec, f.acodec, f.vwidth, f.vheight, f.fps, a.opencount, a.lastaccess
   FROM FileInfo f LEFT JOIN doc.Access a ON a.id = f.id AND a.dbid = ?`;
+
+// Shared by /videos and /videos/ids: dir/tag/untagged/search filter, as a WHERE clause over `f` (FileInfo).
+// Returns { notFound: true } for an unknown dir id, else { whereSql, params }.
+function buildFilter(db, dbid, query) {
+  const { dir, tag, untagged, q } = query;
+  const where = [];
+  const params = [];
+  if (dir !== undefined) {
+    const d = db.prepare('SELECT directory FROM doc.Directories WHERE id = ?').get(intParam(dir, -1, -1, 1e9));
+    if (!d) return { notFound: true };
+    where.push('substr(f.directory, 1, length(?)) = ?');
+    params.push(d.directory, d.directory);
+  }
+  if (untagged === '1') {
+    where.push('NOT EXISTS (SELECT 1 FROM doc.Tagged g WHERE g.id = f.id AND g.dbid = ?)');
+    params.push(dbid);
+  } else if (tag !== undefined) {
+    where.push('EXISTS (SELECT 1 FROM doc.Tagged g WHERE g.id = f.id AND g.tagid = ? AND g.dbid = ?)');
+    params.push(intParam(tag, -1, -1, 1e9), dbid);
+  }
+  for (const term of String(q || '').split(/\s+/).filter(Boolean)) {
+    where.push("f.name LIKE ? ESCAPE '\\'");
+    params.push(`%${escLike(term)}%`);
+  }
+  return { whereSql: where.length ? ' WHERE ' + where.join(' AND ') : '', params };
+}
 
 function attachTagIds(db, dbid, videos) {
   if (!videos.length) return videos;
@@ -102,32 +129,15 @@ export function createLibraryRouter(config) {
   }));
 
   router.get('/videos', withLibrary((db, dbid, req, res) => {
-    const { dir, tag, untagged, missing, q } = req.query;
+    const { missing } = req.query;
     const sortKey = Object.hasOwn(SORTS, req.query.sort) ? req.query.sort : 'wtime';
     const order = req.query.order === 'asc' ? 'ASC' : 'DESC';
     const size = intParam(req.query.size, PAGE_DEFAULT, 1, PAGE_MAX);
     const page = intParam(req.query.page, 1, 1, 1e6);
 
-    const where = [];
-    const params = [];
-    if (dir !== undefined) {
-      const d = db.prepare('SELECT directory FROM doc.Directories WHERE id = ?').get(intParam(dir, -1, -1, 1e9));
-      if (!d) return res.status(404).json({ error: 'dir_not_found' });
-      where.push('substr(f.directory, 1, length(?)) = ?');
-      params.push(d.directory, d.directory);
-    }
-    if (untagged === '1') {
-      where.push('NOT EXISTS (SELECT 1 FROM doc.Tagged g WHERE g.id = f.id AND g.dbid = ?)');
-      params.push(dbid);
-    } else if (tag !== undefined) {
-      where.push('EXISTS (SELECT 1 FROM doc.Tagged g WHERE g.id = f.id AND g.tagid = ? AND g.dbid = ?)');
-      params.push(intParam(tag, -1, -1, 1e9), dbid);
-    }
-    for (const term of String(q || '').split(/\s+/).filter(Boolean)) {
-      where.push("f.name LIKE ? ESCAPE '\\'");
-      params.push(`%${escLike(term)}%`);
-    }
-    const whereSql = where.length ? ' WHERE ' + where.join(' AND ') : '';
+    const f = buildFilter(db, dbid, req.query);
+    if (f.notFound) return res.status(404).json({ error: 'dir_not_found' });
+    const { whereSql, params } = f;
     const orderSql = ` ORDER BY ${SORTS[sortKey]} ${order}, f.id ${order}`;
 
     let total;
@@ -144,6 +154,23 @@ export function createLibraryRouter(config) {
         .all(dbid, ...params, size, (page - 1) * size);
     }
     res.json({ total, page, size, items: attachTagIds(db, dbid, rows.map(toVideo)) });
+  }));
+
+  // Every id matching the current filter (no sort/page) — for シャッフル再生, which shuffles the whole filtered
+  // set client-side, not just the loaded page. Must be registered before /videos/:id so "ids" isn't read as an id.
+  router.get('/videos/ids', withLibrary((db, dbid, req, res) => {
+    const f = buildFilter(db, dbid, req.query);
+    if (f.notFound) return res.status(404).json({ error: 'dir_not_found' });
+    const { whereSql, params } = f;
+    let ids;
+    if (req.query.missing === '1') {
+      ids = db.prepare(`SELECT f.id, f.directory, f.name FROM FileInfo f${whereSql}`).all(...params)
+        .filter((r) => !fs.existsSync(r.directory + r.name)).map((r) => r.id);
+    } else {
+      ids = db.prepare(`SELECT f.id FROM FileInfo f${whereSql}`).all(...params).map((r) => r.id);
+    }
+    if (ids.length > IDS_MAX) return res.status(400).json({ error: 'library_too_large', max: IDS_MAX });
+    res.json({ ids });
   }));
 
   router.get('/videos/:id', withLibrary((db, dbid, req, res) => {
