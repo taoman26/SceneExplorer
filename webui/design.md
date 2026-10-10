@@ -45,8 +45,14 @@ Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 1
   timestamp), info column (path, size, resolution, duration, codec, bitrate, fps, mtime, open count), tag toggle chips,
   buttons ダウンロード / 全画面再生 / VLCで再生 (downloads an .m3u playlist carrying a short-lived play token; for
   formats the browser can't decode). In shuffle mode: a "シャッフル再生中" badge next to the title, a 次へ button, and the
-  video autoplays and auto-advances to a random next video on end (or immediately, looping a few times at most, if the
-  video turns out unavailable/undecodable) instead of just sitting on "再生" like a normally-opened video.
+  video autoplays **in native browser fullscreen** (same effect as pressing 全画面再生) and auto-advances to a random
+  next video on end — or immediately, looping a few times at most, if the video turns out unavailable/undecodable —
+  instead of just sitting small inside the modal like a normally-opened video. The `<video>` element itself stays
+  mounted across advances (not recreated per video) specifically so the browser doesn't exit fullscreen between
+  videos; only the very first video's fullscreen entry follows directly from the シャッフル再生 click (a real user
+  gesture), every later one just rides along on that same still-fullscreen element. While fullscreen, only the
+  native video controls and Escape are reachable — the badge/次へ/close buttons are hidden behind it, by design,
+  same as any other fullscreen video.
 - **Login**: centered 420px card, username / password, サインイン, inline error box.
 - **Admin users**: table (name, role chip, last login, PW変更, 削除), ＋ユーザーを追加. Roles: 管理者 / 一般 / 閲覧のみ.
 
