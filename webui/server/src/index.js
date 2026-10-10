@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
+import { describeClientBuild } from './buildinfo.js';
 import { listenUrls } from './netinfo.js';
 
 const config = loadConfig();
@@ -24,6 +26,17 @@ const server = app.listen(config.port, config.host, (err) => {
   }
   if (!fs.existsSync(path.join(config.clientDir, 'index.html'))) {
     console.warn(`WARNING: web client not built (${config.clientDir}). Run "npm run build" in webui/client (or webui/start.sh).`);
+  } else {
+    const build = describeClientBuild(config.clientDir, path.dirname(fileURLToPath(import.meta.url)));
+    const short = (h) => (h && h !== 'unknown' ? h.slice(0, 7) : h ?? '?');
+    if (!build) {
+      console.log('Web client : built before this version check existed, or dist/ was copied without BUILD_INFO.txt');
+    } else if (build.stale) {
+      console.warn(`WARNING: web client (${short(build.commit)}, built ${build.builtAt}) does not match the running server (${short(build.current)}).`);
+      console.warn('         Rebuild the client (cd webui/client && npm run build); if it was built on another machine, copy client/dist over again.');
+    } else {
+      console.log(`Web client : built from ${short(build.commit)} at ${build.builtAt}`);
+    }
   }
   if (app.locals.db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0) {
     console.warn('NOTICE: no users exist yet. The first visitor can create the administrator account - open the URL above NOW.');

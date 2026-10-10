@@ -104,9 +104,12 @@ Requires **Node.js 22.13 or newer**.
 cd webui
 ./start.sh
 ```
-`start.sh` installs the dependencies and builds the client on first run, then prints the URLs to open, e.g.
-`http://192.168.1.20:8686`. **The first visitor creates the administrator account, so open the page right away.**
-Further users are added by an administrator from the user menu -> *ユーザー管理*.
+`start.sh` installs the dependencies (first run only) and rebuilds the client (every run — a couple of seconds, and it
+guarantees the browser never gets a stale build), then prints the URLs to open, e.g. `http://192.168.1.20:8686`.
+**The first visitor creates the administrator account, so open the page right away.** Further users are added by an
+administrator from the user menu -> *ユーザー管理*. At startup the server also logs which commit `client/dist` was built
+from and warns if it doesn't match the server's own commit — useful if `dist/` was built elsewhere and copied in (see
+"Running on other systems" below), since that's the one case a stale client build can't be caught automatically.
 
 Settings (environment variables, all optional):
 
