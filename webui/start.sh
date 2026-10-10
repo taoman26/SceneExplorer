@@ -9,13 +9,14 @@ command -v node >/dev/null || { echo "Node.js 12.17 or newer is required." >&2; 
 node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>12||(a===12&&b>=17)?0:1)' \
   || { echo "Node.js 12.17 or newer is required (found $(node -v))." >&2; exit 1; }
 [ -d server/node_modules ] || (cd server && npm install --production --no-audit --no-fund)
-if [ ! -f client/dist/index.html ]; then
-  if node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>20||(a===20&&b>=19)?0:1)'; then
-    [ -d client/node_modules ] || (cd client && npm install --no-audit --no-fund)
-    (cd client && npm run build)
-  else
-    echo "WARNING: web client is not built and Node $(node -v) is too old to build it (needs 20.19+)." >&2
-    echo "         Build it on another machine (cd webui/client && npm install && npm run build) and copy client/dist to webui/client/dist." >&2
-  fi
+if node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>20||(a===20&&b>=19)?0:1)'; then
+  # This Node can build the client itself: always rebuild (~1-2s), so a stale dist/ never lingers here.
+  [ -d client/node_modules ] || (cd client && npm install --no-audit --no-fund)
+  (cd client && npm run build)
+elif [ ! -f client/dist/index.html ]; then
+  echo "WARNING: web client is not built and Node $(node -v) is too old to build it (needs 20.19+)." >&2
+  echo "         Build it on another machine (cd webui/client && npm install && npm run build) and copy client/dist to webui/client/dist." >&2
 fi
+# If dist/ was built elsewhere and copied in (the case above), the server logs at startup which commit it came from
+# and warns if it's stale relative to this checkout — see webui/server/src/buildinfo.js.
 exec node --no-warnings server/src/index.js
