@@ -98,6 +98,7 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged,
   const player = useRef<HTMLVideoElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const autoSkipped = useRef<number | null>(null); // video id already auto-skipped, so it only fires once each
+  const fullscreenTried = useRef<number | null>(null); // video id already attempted, so it only fires once each
 
   // Shuffle mode keeps itself moving: a video that turns out unavailable (missing file) or undecodable
   // (browser playback error) is skipped automatically instead of just sitting there.
@@ -108,7 +109,10 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged,
 
   useEffect(() => {
     let stale = false;
-    setVideo(null); setLoadError(null); setPlayError(false);
+    // Deliberately NOT clearing `video` here: in shuffle mode this effect re-runs on every advance (`id` changes
+    // while the modal stays open), and clearing it would unmount/remount the player in between, which would both
+    // flash "読み込み中…" and — the actual reason this matters — drop fullscreen (see the <video> key below).
+    setLoadError(null); setPlayError(false);
     api.getVideo(id).then((v) => { if (!stale) setVideo(v); }).catch((e) => {
       if (!stale) setLoadError(e instanceof api.ApiError && e.status === 404 ? '動画が見つかりません' : '読み込みに失敗しました');
     });
@@ -165,10 +169,20 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged,
             <div className="detail-main">
               <div className="player">
                 {video.available && !playError ? (
-                  <video key={video.id} ref={player} controls preload="none" playsInline autoPlay={shuffling}
+                  <video key={shuffling ? 'shuffle-player' : video.id} ref={player} controls preload="none" playsInline autoPlay={shuffling}
                     poster={video.thumbCount ? api.thumbUrl(video.id, 1) : undefined}
                     src={api.streamUrl(video.id)} onError={() => setPlayError(true)}
-                    onEnded={() => onShuffleAdvance?.(true)} />
+                    onEnded={() => onShuffleAdvance?.(true)}
+                    onPlaying={() => {
+                      // シャッフル再生: maximize playback itself, not just the small inline player (same effect as
+                      // 全画面再生). Each advance mounts a fresh <video> (fullscreen exits when it's unmounted), so
+                      // this re-requests it per video; browsers may refuse a request with no direct user gesture
+                      // behind it (auto-advance via 'ended' isn't one) — fails silently, playback is unaffected.
+                      if (shuffling && fullscreenTried.current !== video.id) {
+                        fullscreenTried.current = video.id;
+                        void player.current?.requestFullscreen?.().catch(() => {});
+                      }
+                    }} />
                 ) : (
                   <div className="player-msg" role="alert">
                     {!video.available
