@@ -33,7 +33,9 @@ library titles in mock-ups). If a screen changes, edit the script, regenerate, t
 Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 14 bold; page title 22 bold.
 
 ## Layout
-- **Header** (60px): logo, search box (300–820px), sort select + direction, user menu (logout; "ユーザー管理" for admin).
+- **Header** (60px): logo, search box (300–820px), sort select + direction, シャッフル再生 button, user menu (logout;
+  "ユーザー管理" for admin). シャッフル再生 shuffles the *currently filtered* result set (folder/tag/untagged/missing/search —
+  not just the loaded page) and opens the detail modal in shuffle mode; disabled when the filtered result is empty.
 - **Sidebar** (240px): フォルダ (すべて + registered directories with counts), タグ (`# name` + counts, "タグなし"), 欠損ファイル.
   Selecting a folder or tag filters the library; active row uses `--chip`.
 - **Grid**: cards 264px wide (min), gap 20px, `auto-fill`. Card = 187:140 thumbnail (first thumb), duration badge bottom-right,
@@ -42,7 +44,9 @@ Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 1
 - **Detail modal** (max 1040px): title, video player (HTML5, range streaming), 10-thumbnail strip (click seeks to the
   timestamp), info column (path, size, resolution, duration, codec, bitrate, fps, mtime, open count), tag toggle chips,
   buttons ダウンロード / 全画面再生 / VLCで再生 (downloads an .m3u playlist carrying a short-lived play token; for
-  formats the browser can't decode).
+  formats the browser can't decode). In shuffle mode: a "シャッフル再生中" badge next to the title, a 次へ button, and the
+  video autoplays and auto-advances to a random next video on end (or immediately, looping a few times at most, if the
+  video turns out unavailable/undecodable) instead of just sitting on "再生" like a normally-opened video.
 - **Login**: centered 420px card, username / password, サインイン, inline error box.
 - **Admin users**: table (name, role chip, last login, PW変更, 削除), ＋ユーザーを追加. Roles: 管理者 / 一般 / 閲覧のみ.
 
@@ -52,3 +56,6 @@ Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 1
 - URL reflects state (`/?dir=3&tag=2&q=..&sort=wtime&order=desc&page=2`) so links are shareable inside the LAN.
 - Unauthenticated → redirect to `/login`; 401 from API → same.
 - Viewer role cannot edit tags. Errors shown as inline banners, never `alert()`.
+- Shuffle mode: order is a client-side Fisher–Yates shuffle of the filtered id list, reshuffled (not just restarted in the
+  same order) once it runs out, so it keeps playing until the user closes the modal. If every remaining video in a pass turns
+  out unavailable/undecodable, shuffle stops itself with a banner instead of spinning forever.

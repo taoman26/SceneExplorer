@@ -53,6 +53,7 @@ play_tokens(token_hash TEXT PK,  -- sha256 of the token; grants ONLY GET .../vid
 | `GET /dirs` | `[{id,directory,displaytext,count}]` |
 | `GET /tags` | `[{tagid,tag,count}]` + `untagged` count |
 | `GET /videos?dir=&tag=&untagged=1&missing=1&q=&sort=&order=&page=&size=` | `{total,page,size,items:[Video]}` |
+| `GET /videos/ids?dir=&tag=&untagged=1&missing=1&q=` | `{ids:[..]}` — every id matching the filter (same filter params as `/videos`, no sort/page/size); for シャッフル再生, which needs the whole filtered set, not one page. Capped at 20000 ids (`library_too_large` 400 beyond that) |
 | `GET /videos/:id` | `Video` with `thumbs[]`, `tags[]` |
 | `GET /videos/:id/thumb/:n` | JPEG thumbnail (n = 1..) |
 | `GET /videos/:id/stream[?download=1]` | video file, HTTP Range supported (206/416); missing file → 404 `file_unavailable`. Counts one open in `Access` (upsert) per user+video per 10 min; not counted for `download=1`, for `viewer` role, or when the document is unwritable (playback never fails because of it) |

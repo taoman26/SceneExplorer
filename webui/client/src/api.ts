@@ -38,6 +38,8 @@ export interface TagInfo { tagid: number; tag: string; count: number }
 export interface TagList { tags: TagInfo[]; untagged: number }
 
 export const listVideos = (params: URLSearchParams) => api<VideoList>(`/videos?${params}`);
+// Every id matching the filter (no sort/page) — for シャッフル再生, which needs the whole filtered set.
+export const listVideoIds = (params: URLSearchParams) => api<{ ids: number[] }>(`/videos/ids?${params}`);
 export const listDirs = () => api<Dir[]>('/dirs');
 export const listTags = () => api<TagList>('/tags');
 export const thumbUrl = (id: number, n = 1) => `/api/videos/${id}/thumb/${n}`;
