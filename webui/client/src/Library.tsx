@@ -84,6 +84,15 @@ export default function Library() {
     });
   }, [update]);
 
+  // Steps back one video within the current pass (the first video of a pass has nothing before it).
+  const prevShuffle = useCallback(() => {
+    setShuffle((prev) => {
+      if (!prev || prev.index <= 0) return prev;
+      update({ v: String(prev.ids[prev.index - 1]) }, false);
+      return { ids: prev.ids, index: prev.index - 1 };
+    });
+  }, [update]);
+
   const fail = useCallback((e: unknown) => {
     if (e instanceof api.ApiError && e.status === 401) { void refresh(); return; }
     setError(e instanceof api.ApiError && e.code === 'library_unavailable'
@@ -246,7 +255,8 @@ export default function Library() {
         )}
       </main>
       {openId !== null && <VideoDetail id={openId} tags={tagList?.tags ?? []} canEdit={canEdit} onClose={closeDetail}
-        onTagsChanged={() => setReload((n) => n + 1)} onShuffleAdvance={shuffle ? advanceShuffle : undefined} />}
+        onTagsChanged={() => setReload((n) => n + 1)} onShuffleAdvance={shuffle ? advanceShuffle : undefined}
+        onShufflePrev={shuffle && shuffle.index > 0 ? prevShuffle : undefined} />}
     </div>
   );
 }
