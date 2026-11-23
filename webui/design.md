@@ -53,6 +53,12 @@ Radius: 8px cards/thumbs, 10–14px panels, 14px chips. Base font 14px; titles 1
   gesture), every later one just rides along on that same still-fullscreen element. While fullscreen, only the
   native video controls and Escape are reachable — the badge/次へ/close buttons are hidden behind it, by design,
   same as any other fullscreen video.
+  **Keyboard (shuffle mode only):** `n` or the media key ⏭ (`MediaTrackNext`) skips to the next random video, exactly like
+  次の動画へ; `p` or ⏮ (`MediaTrackPrevious`) goes back to the previous one, exactly like 前の動画へ (stepping back and then
+  forward replays the same order). 前の動画へ is unavailable (button disabled, key ignored) at the start of a shuffle pass —
+  i.e. on the first video and right after a reshuffle — because earlier passes aren't kept. Both work in fullscreen (where the button is hidden), is ignored while typing in an input/textarea/select,
+  with Ctrl/Alt/Meta held, or on key auto-repeat, and does nothing outside shuffle mode. Arrow keys / Space / `f` are left
+  to the native player.
 - **Login**: centered 420px card, username / password, サインイン, inline error box.
 - **Admin users**: table (name, role chip, last login, PW変更, 削除), ＋ユーザーを追加. Roles: 管理者 / 一般 / 閲覧のみ.
 

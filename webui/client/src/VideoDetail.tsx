@@ -33,11 +33,13 @@ function vlcErrorMessage(e: unknown): string {
   return 'VLC用のプレイリストを作成できませんでした';
 }
 
-export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged, onShuffleAdvance }: {
+export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged, onShuffleAdvance, onShufflePrev }: {
   id: number; tags: api.TagInfo[]; canEdit: boolean; onClose: () => void; onTagsChanged: () => void;
   // Present only in shuffle playback: advances to the next (random) video. `played` is false when this call is an
   // auto-skip (the video turned out unavailable/undecodable) rather than a real end-of-playback.
   onShuffleAdvance?: (played: boolean) => void;
+  // Shuffle only: back to the previous video; undefined when there is none (start of the pass).
+  onShufflePrev?: () => void;
 }) {
   const shuffling = !!onShuffleAdvance;
   const [tagBusy, setTagBusy] = useState(false);
@@ -133,6 +135,23 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged,
       prevFocus?.focus?.();
     };
   }, [onClose]);
+
+  // Shuffle only: `n` / media-next key skips to the next video (works in fullscreen, where the button is hidden).
+  useEffect(() => {
+    if (!onShuffleAdvance) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      const next = e.key === 'n' || e.key === 'N' || e.key === 'MediaTrackNext';
+      const prev = e.key === 'p' || e.key === 'P' || e.key === 'MediaTrackPrevious';
+      if (!next && !prev) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      e.preventDefault();
+      if (next) onShuffleAdvance(true); else onShufflePrev?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onShuffleAdvance, onShufflePrev]);
 
   function seekTo(i: number) {
     const el = player.current;
@@ -250,6 +269,7 @@ export default function VideoDetail({ id, tags, canEdit, onClose, onTagsChanged,
               {vlcError && <div className="error-banner" role="alert">{vlcError}</div>}
               {shuffling && (
                 <div className="detail-actions">
+                  <button disabled={!onShufflePrev} onClick={() => onShufflePrev?.()}>前の動画へ</button>
                   <button onClick={() => onShuffleAdvance?.(true)}>次の動画へ</button>
                 </div>
               )}
